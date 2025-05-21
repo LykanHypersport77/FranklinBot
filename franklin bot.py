@@ -4,7 +4,8 @@ import random
 import requests
 import json
 import os
-import asyncio
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,6 +20,7 @@ bot = commands.Bot(command_prefix="-", intents=intents)
 STEAM_API_KEY = os.getenv("STEAM_API_KEY")
 DISCOD_BOT_TOKEN = os.getenv("DISCOD_BOT_TOKEN")
 HYPIXEL_API_KEY = os.getenv("HYPIXEL_API_KEY")
+SPOTIFY_API_KEY = os.getenv("SPOTIFY_API_KEY")
 
 #----------Hypixel leveling----------#
 SKILL_XP_TABLE = [
@@ -204,13 +206,62 @@ async def jesus(ctx):
     print("reviving jesus:", image_path)
     await ctx.send(file=discord.File(image_path))
 
+
+#----------SPOTIFY--------#
+@bot.command(name="linkspotify")
+async def linkspotify(ctx):
+    user_id = str(ctx.author.id)
+    link = f"http://localhost:8888/login/{user_id}"
+    await ctx.author.send(f"🎧 Click to link your Spotify account:\n{link}")
+    await ctx.send("📩 Check your DMs to link Spotify!")
+
+
+@bot.command(name="spotify")
+async def spotify(ctx):
+    user_id = str(ctx.author.id)
+
+    # Load tokens
+    with open("spotify_tokens.json", "r") as f:
+        token_store = json.load(f)
+
+    if user_id not in token_store:
+        await ctx.send("❌ You haven't linked Spotify. Use `-linkspotify` first.")
+        return
+
+    token_info = token_store[user_id]
+
+    sp = spotipy.Spotify(auth=token_info['access_token'])
+
+    try:
+        top_tracks = sp.current_user_top_tracks(limit=5, time_range='short_term')
+    except spotipy.exceptions.SpotifyException:
+        await ctx.send("❌ Your token expired. Please `-linkspotify` again.")
+        return
+
+    msg = "🎶 **Your Top Tracks This Week:**\n"
+    total_duration = 0
+
+    for i, item in enumerate(top_tracks['items']):
+        name = item['name']
+        artist = item['artists'][0]['name']
+        duration_ms = item['duration_ms']
+        total_duration += duration_ms
+        msg += f"{i+1}. {name} – {artist}\n"
+
+    hours = round(total_duration / 1000 / 60 / 60, 2)
+    msg += f"\n⏱ Estimated Listening Time: **{hours} hrs**"
+
+    await ctx.send(msg)
+
+
+#-------STEAM GAMES-----------#
+
 @bot.command(name="linksteam")
 async def linksteam(ctx, steam_id: str):
     user_steam_ids[str(ctx.author.id)] = steam_id
     save_steam_links()
     await ctx.send(f"✅ Linked your Steam ID: `{steam_id}`")
 
-#-------STEAM GAMES-----------#
 
 @bot.command(name="stats")
 async def stats(ctx):
@@ -536,4 +587,3 @@ async def skyblock(ctx, username: str, profile_name: str = None):
 
 bot.run(DISCOD_BOT_TOKEN)
 
-#docker run --name r6-api -e EMAIL=iamsomeoneelse77@gmail.com -e PASSWORD=Thunderstorm77! -e PORT=3000 -p 3000:3000 -d pololacoste/r6-api
