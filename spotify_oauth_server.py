@@ -11,11 +11,6 @@ CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIFY_API_KEY")
 REDIRECT_URI = "http://127.0.0.1:8888/callback"
 
-# CLIENT_ID = "2122b5793eb440ea9e0b977ec95a0d29"
-# CLIENT_SECRET = "c66f81f3b14e494bb9fc4318f759873b"
-# REDIRECT_URI = "http://127.0.0.1:8888/callback"
-
-
 SCOPE = 'user-top-read'
 
 app = Flask(__name__)
