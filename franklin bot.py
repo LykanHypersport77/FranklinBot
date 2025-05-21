@@ -403,7 +403,7 @@ async def r6stats(ctx, username: str):
                 locale="en-US"
             )
             page = await context.new_page()
-            await page.goto(url, timeout=90000)
+            await page.goto(url, timeout=20000)
 
             # Let JS and Cloudflare load content
             await page.wait_for_timeout(2000)
