@@ -9,6 +9,7 @@ from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 import datetime
+import tempfile
 
 load_dotenv()
 
@@ -332,16 +333,17 @@ async def achievements(ctx, game: str = "btd6"):
         await ctx.send("⚠️ Link your Steam first using `-linksteam`.")
         return
 
-    # Support multiple games by ID
+    # Support multiple games ill add more later ig
     game_ids = {
         "btd6": 960090,
         "phas": 739630,
         "tf2": 440,
-        "smite": 386360
+        "smite": 386360,
+        "satisfactory": 526870,
     }
 
     if game.lower() not in game_ids:
-        await ctx.send("❌ Unknown game. Try `btd6`, `phas`, `smite`, or `tf2`.")
+        await ctx.send("❌ Unknown game. Try `btd6`, `phas`, `smite`, `satisfactory`, or `tf2`.")
         return
     appid = game_ids[game.lower()]
     url = f"http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid={appid}&key={STEAM_API_KEY}&steamid={steam_id}"
@@ -365,7 +367,7 @@ async def achievements(ctx, game: str = "btd6"):
         await ctx.send("⚠️ No dated achievements found.")
         return
 
-    # Build cumulative unlock count over time
+    # Build cumulative graph
     dates = []
     counts = []
     total = 0
@@ -374,7 +376,6 @@ async def achievements(ctx, game: str = "btd6"):
         dates.append(date)
         counts.append(total)
 
-    # Plot it
     plt.figure(figsize=(7, 4))
     plt.plot(dates, counts, marker='o', linestyle='-', color='blue')
     plt.title(f"{ctx.author.display_name}'s {game.upper()} Achievement Progress")
@@ -383,11 +384,16 @@ async def achievements(ctx, game: str = "btd6"):
     plt.grid(True)
     plt.tight_layout()
 
-    filename = f"achievements_progress_{ctx.author.id}.png"
-    plt.savefig(filename)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
+        filename = tmpfile.name
+        plt.savefig(filename)
+
     plt.close()
 
-    await ctx.send(file=discord.File(filename))
+    try:
+        await ctx.send(file=discord.File(filename))
+    finally:
+        os.remove(filename)
 
 #--------BTD6------------#
 @bot.command(name="btd6")
