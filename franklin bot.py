@@ -206,7 +206,6 @@ async def jesus(ctx):
     print("reviving jesus:", image_path)
     await ctx.send(file=discord.File(image_path))
 
-
 #----------SPOTIFY--------#
 @bot.command(name="linkspotify")
 async def linkspotify(ctx):
@@ -214,7 +213,6 @@ async def linkspotify(ctx):
     link = f"http://localhost:8888/login/{user_id}"
     await ctx.author.send(f"🎧 Click to link your Spotify account:\n{link}")
     await ctx.send("📩 Check your DMs to link Spotify!")
-
 
 @bot.command(name="spotify")
 async def spotify(ctx):
@@ -252,7 +250,6 @@ async def spotify(ctx):
     msg += f"\n⏱ Estimated Listening Time: **{hours} hrs**"
 
     await ctx.send(msg)
-
 
 #-------STEAM GAMES-----------#
 
@@ -319,6 +316,53 @@ async def topgames(ctx):
         name = game['name']
         hours = round(game.get('playtime_forever', 0) / 60, 1)
         msg += f"• {name}: {hours} hrs\n"
+
+    await ctx.send(msg)
+
+
+#--------BTD6------------#
+@bot.command(name="btd6")
+async def btd6(ctx):
+    steam_id = user_steam_ids.get(str(ctx.author.id))
+    if not steam_id:
+        await ctx.send("⚠️ You haven’t linked your Steam account. Use `-linksteam <steam_id>`.")
+        return
+
+    # Get playtime
+    url_games = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={STEAM_API_KEY}&steamid={steam_id}&include_appinfo=1&format=json"
+    games_res = requests.get(url_games)
+    if games_res.status_code != 200:
+        await ctx.send("❌ Could not fetch Steam game data.")
+        return
+
+    games_data = games_res.json()
+    btd6_data = None
+    for game in games_data["response"].get("games", []):
+        if game["appid"] == 960090:
+            btd6_data = game
+            break
+
+    if not btd6_data:
+        await ctx.send("❌ You don't appear to own Bloons TD 6 on Steam.")
+        return
+
+    playtime_hours = round(btd6_data["playtime_forever"] / 60, 1)
+
+    # Get achievements
+    url_achievements = f"http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=960090&key={STEAM_API_KEY}&steamid={steam_id}"
+    ach_res = requests.get(url_achievements)
+
+    if ach_res.status_code != 200:
+        await ctx.send(f"🎈 **BTD6 Stats**\n• Playtime: {playtime_hours} hrs\n⚠️ Achievements unavailable (private or hidden).")
+        return
+
+    ach_data = ach_res.json()
+    achievements = ach_data.get("playerstats", {}).get("achievements", [])
+    unlocked_count = sum(1 for a in achievements if a.get("achieved") == 1)
+
+    msg = f"🎈 **BTD6 Stats for {ctx.author.display_name}**\n"
+    msg += f"• 🕒 Playtime: {playtime_hours} hrs\n"
+    msg += f"• 🏆 Achievements Unlocked: {unlocked_count} / {len(achievements)}"
 
     await ctx.send(msg)
 
@@ -586,4 +630,3 @@ async def skyblock(ctx, username: str, profile_name: str = None):
     await ctx.send(msg)
 
 bot.run(DISCOD_BOT_TOKEN)
-
