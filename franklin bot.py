@@ -7,6 +7,8 @@ import os
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
+import matplotlib.pyplot as plt
+import datetime
 
 load_dotenv()
 
@@ -319,6 +321,73 @@ async def topgames(ctx):
 
     await ctx.send(msg)
 
+#----------ACHIEVMENTS----------#
+
+import matplotlib.pyplot as plt
+
+@bot.command(name="achievements")
+async def achievements(ctx, game: str = "btd6"):
+    steam_id = user_steam_ids.get(str(ctx.author.id))
+    if not steam_id:
+        await ctx.send("⚠️ Link your Steam first using `-linksteam`.")
+        return
+
+    # Support multiple games by ID
+    game_ids = {
+        "btd6": 960090,
+        "phas": 739630,
+        "tf2": 440,
+        "smite": 386360
+    }
+
+    if game.lower() not in game_ids:
+        await ctx.send("❌ Unknown game. Try `btd6`, `phas`, `smite`, or `tf2`.")
+        return
+    appid = game_ids[game.lower()]
+    url = f"http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid={appid}&key={STEAM_API_KEY}&steamid={steam_id}"
+    res = requests.get(url)
+    if res.status_code != 200:
+        await ctx.send("❌ Failed to fetch achievement data.")
+        return
+
+    achievements = res.json().get("playerstats", {}).get("achievements", [])
+    if not achievements:
+        await ctx.send("❌ No unlocked achievements found.")
+        return
+
+    # Filter and sort unlocked achievements by unlock time
+    unlocks = sorted([
+        datetime.datetime.fromtimestamp(a['unlocktime'])
+        for a in achievements if a.get('achieved') == 1 and a.get('unlocktime') > 0
+    ])
+
+    if not unlocks:
+        await ctx.send("⚠️ No dated achievements found.")
+        return
+
+    # Build cumulative unlock count over time
+    dates = []
+    counts = []
+    total = 0
+    for date in unlocks:
+        total += 1
+        dates.append(date)
+        counts.append(total)
+
+    # Plot it
+    plt.figure(figsize=(7, 4))
+    plt.plot(dates, counts, marker='o', linestyle='-', color='blue')
+    plt.title(f"{ctx.author.display_name}'s {game.upper()} Achievement Progress")
+    plt.xlabel("Date")
+    plt.ylabel("Total Achievements Unlocked")
+    plt.grid(True)
+    plt.tight_layout()
+
+    filename = f"achievements_progress_{ctx.author.id}.png"
+    plt.savefig(filename)
+    plt.close()
+
+    await ctx.send(file=discord.File(filename))
 
 #--------BTD6------------#
 @bot.command(name="btd6")
@@ -367,9 +436,10 @@ async def btd6(ctx):
     await ctx.send(msg)
 
 #---------CSGO2-------------#
+
 @bot.command(name="cs2")
 async def cs2(ctx, steam_id: str = None):
-    # Use linked Steam ID if available
+    # Use linked Steam ID
     if not steam_id:
         steam_id = user_steam_ids.get(str(ctx.author.id))
 
@@ -387,7 +457,7 @@ async def cs2(ctx, steam_id: str = None):
             await ctx.send("⚠️ Couldn’t retrieve CS2 stats. Make sure your game stats are public.")
             return
 
-        # Extract some common stats
+        # Extract stats
         stat_dict = {stat['name']: stat['value'] for stat in player_stats}
 
         total_kills = stat_dict.get("total_kills", 0)
@@ -449,10 +519,8 @@ async def r6stats(ctx, username: str):
             page = await context.new_page()
             await page.goto(url, timeout=20000)
 
-            # Let JS and Cloudflare load content
             await page.wait_for_timeout(2000)
 
-            # Extract values (KD, Win Rate etc.)
             values = await page.locator("span.stat-value--text").all_inner_texts()
 
             # Extract rank info
@@ -494,7 +562,6 @@ async def r6stats(ctx, username: str):
         rank = result["rank"]
         rp = result["rp"]
 
-        # Safely extract mode stats
         def extract_mode_stats(mode):
             if mode in values:
                 i = values.index(mode)
@@ -507,7 +574,7 @@ async def r6stats(ctx, username: str):
         standard_kd, standard_win = extract_mode_stats("Standard")
         quick_kd, quick_win = extract_mode_stats("Quick Match")
 
-        # Format message
+        # build message
         msg = f"**🔫 Rainbow Six Siege Stats for `{username}`**\n"
         msg += f"🏅 **Current Rank**: {rank} ({rp})\n\n"
         msg += f"📊 **Ranked**\n• KD: {ranked_kd} | Win Rate: {ranked_win}\n"
@@ -544,7 +611,7 @@ async def skyblock(ctx, username: str, profile_name: str = None):
         await ctx.send(f"⚠️ `{username}` has no SkyBlock profiles.")
         return
 
-    # Step 3: Find matching profile
+    # find profile
     selected = None
     if profile_name:
         profile_name = profile_name.lower()
