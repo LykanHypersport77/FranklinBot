@@ -4,8 +4,6 @@ import random
 import requests
 import json
 import os
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 import datetime
@@ -24,7 +22,21 @@ STEAM_API_KEY = os.getenv("STEAM_API_KEY")
 DISCOD_BOT_TOKEN = os.getenv("DISCOD_BOT_TOKEN")
 HYPIXEL_API_KEY = os.getenv("HYPIXEL_API_KEY")
 SPOTIFY_API_KEY = os.getenv("SPOTIFY_API_KEY")
-LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
+LASTFM_API_KEY = "df5b558cad1fa2230f1707d5ef4e737d"
+# os.getenv("LASTFM_API_KEY")
+
+LASTFM_LINK_FILE = "lastfm_links.json"
+
+if os.path.exists(LASTFM_LINK_FILE):
+    with open(LASTFM_LINK_FILE, "r") as f:
+        lastfm_users = json.load(f)
+else:
+    lastfm_users = {}
+
+# Save updated links
+def save_lastfm_links():
+    with open(LASTFM_LINK_FILE, "w") as f:
+        json.dump(lastfm_users, f)
 
 #----------Hypixel leveling----------#
 SKILL_XP_TABLE = [
@@ -72,7 +84,7 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    if bot.user.mentioned_in(message) and not message.author.bot:
+    if bot.user.mentioned_in(message):
         await message.channel.send("I gotta poopy")
     
     await bot.process_commands(message)
@@ -211,25 +223,26 @@ async def jesus(ctx):
     await ctx.send(file=discord.File(image_path))
 
 #----------SPOTIFY--------#
-LASTFM_LINK_FILE = "lastfm_links.json"
-
-if os.path.exists(LASTFM_LINK_FILE):
-    with open(LASTFM_LINK_FILE, "r") as f:
-        lastfm_users = json.load(f)
-else:
-    lastfm_users = {}
-
-# Save updated links
-def save_lastfm_links():
-    with open(LASTFM_LINK_FILE, "w") as f:
-        json.dump(lastfm_users, f)
 
 @bot.command(name="linkfm")
 async def linkfm(ctx, username: str):
-    lastfm_users[str(ctx.author.id)] = username
+    user_id = str(ctx.author.id)
+
+    # Load existing links or initialize
+    if os.path.exists("lastfm_links.json"):
+        with open("lastfm_links.json", "r") as f:
+            user_links = json.load(f)
+    else:
+        user_links = {}
+
+    user_links[user_id] = username
+
+    with open("lastfm_links.json", "w") as f:
+        json.dump(user_links, f)
+
     await ctx.send(f"✅ Linked your Last.fm as `{username}`.")
 
-@bot.command(name="fm")
+@bot.command(name="fmtop")
 async def fm(ctx, username: str = None):
     user_id = str(ctx.author.id)
 
@@ -237,7 +250,7 @@ async def fm(ctx, username: str = None):
     if not username:
         username = lastfm_users.get(user_id)
         if not username:
-            await ctx.send("⚠️ You haven’t linked your Last.fm. Use `-linklastfm <username>` first.")
+            await ctx.send("⚠️ You haven’t linked your Last.fm. Use `-linkfm <username>` first.")
             return
 
     url = f"http://ws.audioscrobbler.com/2.0/?method=user.gettoptracks&user={username}&api_key={LASTFM_API_KEY}&format=json&limit=5&period=7day"
@@ -245,6 +258,8 @@ async def fm(ctx, username: str = None):
 
     if res.status_code != 200:
         await ctx.send("❌ Failed to fetch Last.fm data. Check your username or try again later.")
+        print("Status:", res.status_code)
+        print("Raw response:", res.text)
         return
 
     data = res.json()
@@ -262,6 +277,55 @@ async def fm(ctx, username: str = None):
 
     await ctx.send(msg)
 
+@bot.command(name="fm", description="Show now playing or last played track from Last.fm")
+async def lastfm_nowplaying(ctx, target_username: str = None):
+    user_id = str(ctx.author.id)
+
+    # Load Last.fm links
+    if os.path.exists("lastfm_links.json"):
+        with open("lastfm_links.json", "r") as f:
+            user_links = json.load(f)
+    else:
+        user_links = {}
+
+    if user_id not in user_links:
+        await ctx.send("⚠️ You haven’t linked your Last.fm. Use `-linkfm <username>`.")
+        return
+
+    if target_username:
+        username = target_username
+        display_name = target_username  # Use queried Last.fm name
+    else:
+        if user_id not in user_links:
+            await ctx.send("⚠️ You haven’t linked your Last.fm account. Use `-linkfm <username>`.")
+            return
+        username = user_links[user_id]
+        display_name = ctx.author.display_name
+
+    url = f"http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user={username}&api_key={LASTFM_API_KEY}&format=json&limit=1"
+    res = requests.get(url)
+
+    if res.status_code != 200:
+        await ctx.send("❌ Failed to fetch Last.fm data. Try again later.")
+        return
+
+    data = res.json()
+    tracks = data.get("recenttracks", {}).get("track", [])
+    if not tracks:
+        await ctx.send(f"📭 No recent tracks found for `{display_name}`.")
+        return
+
+    track = tracks[0]
+    artist = track.get("artist", {}).get("#text", "Unknown Artist")
+    title = track.get("name", "Unknown Track")
+    album = track.get("album", {}).get("#text", "Unknown Album")
+    now_playing = track.get("@attr", {}).get("nowplaying", "false") == "true"
+
+    if now_playing:
+        msg = f"🎧 {display_name} is currently listening to:\n**{title}** by *{artist}* (Album: {album})"
+    else:
+        msg = f"🎶 Last played by {display_name}:\n**{title}** by *{artist}* (Album: {album})"
+    await ctx.send(msg)
 #-------STEAM GAMES-----------#
 
 @bot.command(name="linksteam")
