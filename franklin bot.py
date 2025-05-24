@@ -22,8 +22,7 @@ STEAM_API_KEY = os.getenv("STEAM_API_KEY")
 DISCOD_BOT_TOKEN = os.getenv("DISCOD_BOT_TOKEN")
 HYPIXEL_API_KEY = os.getenv("HYPIXEL_API_KEY")
 SPOTIFY_API_KEY = os.getenv("SPOTIFY_API_KEY")
-LASTFM_API_KEY = "df5b558cad1fa2230f1707d5ef4e737d"
-# os.getenv("LASTFM_API_KEY")
+LASTFM_API_KEY = os.getenv("FM_API_KEY")
 
 LASTFM_LINK_FILE = "lastfm_links.json"
 
