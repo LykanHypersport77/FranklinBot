@@ -24,6 +24,7 @@ STEAM_API_KEY = os.getenv("STEAM_API_KEY")
 DISCOD_BOT_TOKEN = os.getenv("DISCOD_BOT_TOKEN")
 HYPIXEL_API_KEY = os.getenv("HYPIXEL_API_KEY")
 SPOTIFY_API_KEY = os.getenv("SPOTIFY_API_KEY")
+LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
 
 #----------Hypixel leveling----------#
 SKILL_XP_TABLE = [
@@ -210,47 +211,54 @@ async def jesus(ctx):
     await ctx.send(file=discord.File(image_path))
 
 #----------SPOTIFY--------#
-@bot.command(name="linkspotify")
-async def linkspotify(ctx):
+LASTFM_LINK_FILE = "lastfm_links.json"
+
+if os.path.exists(LASTFM_LINK_FILE):
+    with open(LASTFM_LINK_FILE, "r") as f:
+        lastfm_users = json.load(f)
+else:
+    lastfm_users = {}
+
+# Save updated links
+def save_lastfm_links():
+    with open(LASTFM_LINK_FILE, "w") as f:
+        json.dump(lastfm_users, f)
+
+@bot.command(name="linkfm")
+async def linkfm(ctx, username: str):
+    lastfm_users[str(ctx.author.id)] = username
+    await ctx.send(f"✅ Linked your Last.fm as `{username}`.")
+
+@bot.command(name="fm")
+async def fm(ctx, username: str = None):
     user_id = str(ctx.author.id)
-    link = f"http://localhost:8888/login/{user_id}"
-    await ctx.author.send(f"🎧 Click to link your Spotify account:\n{link}")
-    await ctx.send("📩 Check your DMs to link Spotify!")
 
-@bot.command(name="spotify")
-async def spotify(ctx):
-    user_id = str(ctx.author.id)
+    # Use linked username if none provided
+    if not username:
+        username = lastfm_users.get(user_id)
+        if not username:
+            await ctx.send("⚠️ You haven’t linked your Last.fm. Use `-linklastfm <username>` first.")
+            return
 
-    # Load tokens
-    with open("spotify_tokens.json", "r") as f:
-        token_store = json.load(f)
+    url = f"http://ws.audioscrobbler.com/2.0/?method=user.gettoptracks&user={username}&api_key={LASTFM_API_KEY}&format=json&limit=5&period=7day"
+    res = requests.get(url)
 
-    if user_id not in token_store:
-        await ctx.send("❌ You haven't linked Spotify. Use `-linkspotify` first.")
+    if res.status_code != 200:
+        await ctx.send("❌ Failed to fetch Last.fm data. Check your username or try again later.")
         return
 
-    token_info = token_store[user_id]
-
-    sp = spotipy.Spotify(auth=token_info['access_token'])
-
-    try:
-        top_tracks = sp.current_user_top_tracks(limit=5, time_range='short_term')
-    except spotipy.exceptions.SpotifyException:
-        await ctx.send("❌ Your token expired. Please `-linkspotify` again.")
+    data = res.json()
+    tracks = data.get("toptracks", {}).get("track", [])
+    if not tracks:
+        await ctx.send(f"⚠️ No recent tracks found for `{username}`.")
         return
 
-    msg = "🎶 **Your Top Tracks This Week:**\n"
-    total_duration = 0
-
-    for i, item in enumerate(top_tracks['items']):
-        name = item['name']
-        artist = item['artists'][0]['name']
-        duration_ms = item['duration_ms']
-        total_duration += duration_ms
-        msg += f"{i+1}. {name} – {artist}\n"
-
-    hours = round(total_duration / 1000 / 60 / 60, 2)
-    msg += f"\n⏱ Estimated Listening Time: **{hours} hrs**"
+    msg = f"🎶 **Top Tracks This Week for `{username}`:**\n"
+    for i, track in enumerate(tracks):
+        name = track["name"]
+        artist = track["artist"]["name"]
+        playcount = track["playcount"]
+        msg += f"{i+1}. {name} – {artist} ({playcount} plays)\n"
 
     await ctx.send(msg)
 
