@@ -640,9 +640,9 @@ async def r6stats(ctx, username: str):
                 locale="en-US"
             )
             page = await context.new_page()
-            await page.goto(url, timeout=20000)
+            await page.goto(url, timeout=90000)
 
-            await page.wait_for_timeout(2000)
+            await page.wait_for_timeout(10000)
 
             values = await page.locator("span.stat-value--text").all_inner_texts()
 
