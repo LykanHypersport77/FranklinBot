@@ -628,7 +628,11 @@ async def r6stats(ctx, username: str):
             # Launch headless but spoof as a real browser
             browser = await p.chromium.launch(
                 headless=True,
-                args=["--disable-blink-features=AutomationControlled"]
+                args=[
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-blink-features=AutomationControlled"
+                ]       
             )
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
