@@ -21,7 +21,6 @@ bot = commands.Bot(command_prefix="-", intents=intents)
 STEAM_API_KEY = os.getenv("STEAM_API_KEY")
 DISCOD_BOT_TOKEN = os.getenv("DISCOD_BOT_TOKEN")
 HYPIXEL_API_KEY = os.getenv("HYPIXEL_API_KEY")
-SPOTIFY_API_KEY = os.getenv("SPOTIFY_API_KEY")
 LASTFM_API_KEY = os.getenv("FM_API_KEY")
 
 LASTFM_LINK_FILE = "lastfm_links.json"
@@ -89,7 +88,6 @@ async def on_message(message):
     await bot.process_commands(message)
 
 # -------- Commands --------
-
 @bot.command(name="bark")
 async def bark(ctx):
     folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\benno pics"
@@ -221,8 +219,7 @@ async def jesus(ctx):
     print("reviving jesus:", image_path)
     await ctx.send(file=discord.File(image_path))
 
-#----------SPOTIFY--------#
-
+#----------LASTFM--------#
 @bot.command(name="linkfm")
 async def linkfm(ctx, username: str):
     user_id = str(ctx.author.id)
@@ -325,14 +322,13 @@ async def lastfm_nowplaying(ctx, target_username: str = None):
     else:
         msg = f"🎶 Last played by {display_name}:\n**{title}** by *{artist}* (Album: {album})"
     await ctx.send(msg)
-#-------STEAM GAMES-----------#
 
+#-------STEAM GAMES-----------#
 @bot.command(name="linksteam")
 async def linksteam(ctx, steam_id: str):
     user_steam_ids[str(ctx.author.id)] = steam_id
     save_steam_links()
     await ctx.send(f"✅ Linked your Steam ID: `{steam_id}`")
-
 
 @bot.command(name="stats")
 async def stats(ctx):
@@ -392,6 +388,52 @@ async def topgames(ctx):
         msg += f"• {name}: {hours} hrs\n"
 
     await ctx.send(msg)
+
+@bot.command(name="gameinfo")
+async def gameinfo(ctx, *, game_name: str):
+    search_url = f"https://store.steampowered.com/api/storesearch/?term={game_name}&cc=us&l=en"
+    search_res = requests.get(search_url)
+
+    if search_res.status_code != 200:
+        await ctx.send("❌ Failed to contact Steam Store.")
+        return
+
+    search_data = search_res.json()
+    items = search_data.get("items", [])
+    if not items:
+        await ctx.send(f"No results found for `{game_name}`.")
+        return
+
+    appid = items[0]["id"]
+    details_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&cc=us&l=en"
+    details_res = requests.get(details_url)
+
+    if details_res.status_code != 200:
+        await ctx.send("❌ Could not fetch game details.")
+        return
+
+    details = details_res.json().get(str(appid), {}).get("data")
+    if not details:
+        await ctx.send("⚠️ Game details unavailable.")
+        return
+
+    name = details.get("name", "Unknown")
+    release = details.get("release_date", {}).get("date", "Unknown")
+    is_free = details.get("is_free", False)
+    price_info = details.get("price_overview", {})
+    price = "Free" if is_free else f"{price_info.get('final_formatted', 'Unknown')}"
+    score = details.get("metacritic", {}).get("score", "N/A")
+    desc = details.get("short_description", "No description.")
+    image = details.get("header_image", "")
+    url = f"https://store.steampowered.com/app/{appid}/"
+
+    embed = discord.Embed(title=name, description=desc, color=discord.Color.green(), url=url)
+    embed.add_field(name="🗓 Release Date", value=release, inline=True)
+    embed.add_field(name="💰 Price", value=price, inline=True)
+    embed.add_field(name="📈 Metacritic", value=score, inline=True)
+    embed.set_thumbnail(url=image)
+
+    await ctx.send(embed=embed)
 
 #----------ACHIEVMENTS----------#
 
