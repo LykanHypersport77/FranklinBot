@@ -26,16 +26,6 @@ LASTFM_API_KEY = os.getenv("FM_API_KEY")
 LASTFM_LINK_FILE = "lastfm_links.json"
 GHOST_JSON_PATH = "phasmophobia_ghosts.json"
 
-if os.path.exists(LASTFM_LINK_FILE):
-    with open(LASTFM_LINK_FILE, "r") as f:
-        lastfm_users = json.load(f)
-else:
-    lastfm_users = {}
-
-# Save updated links
-def save_lastfm_links():
-    with open(LASTFM_LINK_FILE, "w") as f:
-        json.dump(lastfm_users, f)
 
 #----------Hypixel leveling----------#
 SKILL_XP_TABLE = [
@@ -221,6 +211,16 @@ async def jesus(ctx):
     await ctx.send(file=discord.File(image_path))
 
 #----------LASTFM--------#
+if os.path.exists(LASTFM_LINK_FILE):
+    with open(LASTFM_LINK_FILE, "r") as f:
+        lastfm_users = json.load(f)
+else:
+    lastfm_users = {}
+# Save updated links
+def save_lastfm_links():
+    with open(LASTFM_LINK_FILE, "w") as f:
+        json.dump(lastfm_users, f)
+
 @bot.command(name="linkfm")
 async def linkfm(ctx, username: str):
     user_id = str(ctx.author.id)
@@ -333,6 +333,60 @@ async def lastfm_nowplaying(ctx, target_username: str = None):
 
     await ctx.send(embed=embed)
 
+@bot.command(name="lyrics")
+async def lyrics(ctx, username: str = None):
+    user_id = str(ctx.author.id)
+
+    # Load linked Last.fm username
+    if os.path.exists("lastfm_links.json"):
+        with open("lastfm_links.json", "r") as f:
+            user_links = json.load(f)
+    else:
+        user_links = {}
+
+    if not username:
+        if user_id not in user_links:
+            await ctx.send("⚠️ You haven’t linked your Last.fm account. Use `-linkfm <username>`.")
+            return
+        username = user_links[user_id]
+
+    # Step 1: Get now playing or last played track
+    url = f"http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user={username}&api_key={LASTFM_API_KEY}&format=json&limit=1"
+    res = requests.get(url)
+
+    if res.status_code != 200:
+        await ctx.send("❌ Failed to fetch Last.fm data.")
+        return
+
+    data = res.json()
+    tracks = data.get("recenttracks", {}).get("track", [])
+    if not tracks:
+        await ctx.send(f"📭 No recent tracks found for `{username}`.")
+        return
+
+    track = tracks[0]
+    artist = track.get("artist", {}).get("#text", "Unknown Artist")
+    title = track.get("name", "Unknown Track")
+
+    # Step 2: Search for lyrics using lyrics.ovh
+    lyrics_res = requests.get(f"https://api.lyrics.ovh/v1/{artist}/{title}")
+
+    if lyrics_res.status_code != 200:
+        await ctx.send(f"❌ Lyrics not found for **{title}** by *{artist}*.")
+        return
+
+    lyrics = lyrics_res.json().get("lyrics", "Lyrics not available.")
+    if len(lyrics) > 2000:
+        lyrics = lyrics[:1997] + "..."
+
+    # Step 3: Send embed
+    embed = discord.Embed(
+        title=f"🎶 Lyrics for {title}",
+        description=f"By {artist}",
+        color=discord.Color.magenta()
+    )
+    embed.add_field(name="Lyrics", value=lyrics, inline=False)
+    await ctx.send(embed=embed)
 
 #-------STEAM GAMES-----------#
 @bot.command(name="linksteam")
@@ -865,6 +919,5 @@ async def skyblock(ctx, username: str, profile_name: str = None):
     embed.add_field(name="🔗 SkyCrypt", value=f"[View Full Profile](https://sky.shiiyu.moe/stats/{username}/{profile_label})", inline=False)
 
     await ctx.send(embed=embed)
-
 
 bot.run(DISCOD_BOT_TOKEN)
