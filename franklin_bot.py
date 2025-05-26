@@ -620,20 +620,20 @@ async def cs2(ctx, steam_id: str = None):
             print("CS2 playtime fetch failed:", e)
             playtime_hours = None
 
-    summary_url = f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
-    summary_res = requests.get(summary_url)
-    steam_name = steam_id  # fallback
+        summary_url = f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
+        summary_res = requests.get(summary_url)
+        steam_name = steam_id  # fallback
 
-    if summary_res.status_code == 200:
-        players = summary_res.json().get("response", {}).get("players", [])
-    if players:
-        steam_name = players[0].get("personaname", steam_id)
+        if summary_res.status_code == 200:
+            players = summary_res.json().get("response", {}).get("players", [])
+        if players:
+            steam_name = players[0].get("personaname", steam_id)
 
         # Build embed
-        embed = discord.Embed(
-    title="🎮 CS2 Stats",
-    description=f"Stats for **{steam_name}**",
-    color=discord.Color.dark_gold()
+            embed = discord.Embed(
+        title="🎮 CS2 Stats",
+        description=f"Stats for **{steam_name}**",
+        color=discord.Color.dark_gold()
 )
 
         embed.add_field(name="🧠 Headshots", value=f"{headshots:,}", inline=True)
