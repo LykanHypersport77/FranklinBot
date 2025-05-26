@@ -349,7 +349,7 @@ async def stats(ctx):
 
     url = f"http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key={STEAM_API_KEY}&steamid={steam_id}&format=json"
     response = requests.get(url)
-    
+
     if response.status_code != 200:
         await ctx.send("❌ Failed to fetch stats. Try again later.")
         return
@@ -357,16 +357,22 @@ async def stats(ctx):
     data = response.json()
     games = data.get("response", {}).get("games", [])
     if not games:
-        await ctx.send("You haven’t played any games in the last 2 weeks.")
+        await ctx.send("📭 You haven’t played any games in the last 2 weeks.")
         return
 
-    msg = "**🎮 Your last 2 weeks of Steam playtime:**\n"
+    embed = discord.Embed(
+        title=f"🎮 Recent Steam Playtime (Last 2 Weeks)",
+        description="Here are your most recently played games:",
+        color=discord.Color.green()
+    )
+
     for game in games:
         name = game['name']
         hours = round(game.get('playtime_2weeks', 0) / 60, 1)
-        msg += f"• {name}: {hours} hrs\n"
+        embed.add_field(name=name, value=f"{hours} hrs", inline=False)
 
-    await ctx.send(msg)
+    await ctx.send(embed=embed)
+
 
 @bot.command(name="topgames")
 async def topgames(ctx):
@@ -385,19 +391,25 @@ async def topgames(ctx):
     data = response.json()
     games = data.get("response", {}).get("games", [])
     if not games:
-        await ctx.send("You don’t seem to own any games.")
+        await ctx.send("📭 You don’t seem to own any games.")
         return
 
     sorted_games = sorted(games, key=lambda g: g.get("playtime_forever", 0), reverse=True)
-    top_games = sorted_games[:5]  # Top 5
+    top_games = sorted_games[:5]
 
-    msg = "**🏆 Your Top Played Games:**\n"
+    embed = discord.Embed(
+        title=f"🏆 Top 5 Played Games on Steam",
+        description=f"For {ctx.author.display_name}",
+        color=discord.Color.orange()
+    )
+
     for game in top_games:
         name = game['name']
         hours = round(game.get('playtime_forever', 0) / 60, 1)
-        msg += f"• {name}: {hours} hrs\n"
+        embed.add_field(name=name, value=f"{hours} hrs", inline=False)
 
-    await ctx.send(msg)
+    await ctx.send(embed=embed)
+
 
 @bot.command(name="gameinfo")
 async def gameinfo(ctx, *, game_name: str):
@@ -588,7 +600,6 @@ async def cs2(ctx, steam_id: str = None):
 
         # Extract stats
         stat_dict = {stat['name']: stat['value'] for stat in player_stats}
-
         total_kills = stat_dict.get("total_kills", 0)
         total_deaths = stat_dict.get("total_deaths", 0)
         kd_ratio = round(total_kills / total_deaths, 2) if total_deaths else "∞"
@@ -596,6 +607,7 @@ async def cs2(ctx, steam_id: str = None):
         mvps = stat_dict.get("total_mvps", 0)
         headshots = stat_dict.get("total_kills_headshot", 0)
 
+        # Try to get playtime
         try:
             games_url = f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key={STEAM_API_KEY}&steamid={steam_id}&include_played_free_games=1"
             games_res = requests.get(games_url)
@@ -608,23 +620,30 @@ async def cs2(ctx, steam_id: str = None):
             print("CS2 playtime fetch failed:", e)
             playtime_hours = None
 
-        msg = f"**🎮 CS2 Stats for `<{steam_id}>`:**\n"
-        msg += f"• 🧠 Headshots: {headshots:,}\n"
-        msg += f"• 🔫 Total Kills: {total_kills:,}\n"
-        msg += f"• 💀 Total Deaths: {total_deaths:,}\n"
-        msg += f"• ⚖️ K/D Ratio: {kd_ratio}\n"
-        msg += f"• 🏆 MVPs: {mvps:,}\n"
-        msg += f"• 📊 Matches Played: {matches_played:,}"
-        if playtime_hours is not None:
-            msg += f"\n• ⏱ Playtime: {playtime_hours} hrs"
-        else:
-            msg += f"\n• ⏱ Playtime: Unknown (profile may be private)"
+        # Build embed
+        embed = discord.Embed(
+            title="🎮 CS2 Stats",
+            description=f"Stats for `<{steam_id}>`",
+            color=discord.Color.dark_gold()
+        )
+        embed.add_field(name="🧠 Headshots", value=f"{headshots:,}", inline=True)
+        embed.add_field(name="🔫 Kills", value=f"{total_kills:,}", inline=True)
+        embed.add_field(name="💀 Deaths", value=f"{total_deaths:,}", inline=True)
+        embed.add_field(name="⚖️ K/D Ratio", value=str(kd_ratio), inline=True)
+        embed.add_field(name="🏆 MVPs", value=f"{mvps:,}", inline=True)
+        embed.add_field(name="📊 Matches", value=f"{matches_played:,}", inline=True)
 
-        await ctx.send(msg)
+        if playtime_hours is not None:
+            embed.add_field(name="⏱ Playtime", value=f"{playtime_hours} hrs", inline=True)
+        else:
+            embed.add_field(name="⏱ Playtime", value="Unknown (private)", inline=True)
+
+        await ctx.send(embed=embed)
 
     except Exception as e:
         print("CS2 stats error:", e)
         await ctx.send("❌ Failed to fetch CS2 stats. Steam may be down or the profile might be private.")
+
 
 #---------R6---------------#
 @bot.command(name="r6")
@@ -635,14 +654,13 @@ async def r6stats(ctx, username: str):
         url = f"https://r6.tracker.network/r6siege/profile/ubi/{username}/overview"
 
         async with async_playwright() as p:
-            # Launch headless but spoof as a real browser
             browser = await p.chromium.launch(
                 headless=True,
                 args=[
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
                     "--disable-blink-features=AutomationControlled"
-                ]       
+                ]
             )
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -651,35 +669,18 @@ async def r6stats(ctx, username: str):
             )
             page = await context.new_page()
             await page.goto(url, timeout=90000)
-
             await page.wait_for_timeout(10000)
 
             values = await page.locator("span.stat-value--text").all_inner_texts()
 
-            # Extract rank info
             try:
-                # Check if a ranked element exists
-                rank_elements = page.locator("div.grid span.truncate")
-                rp_elements = page.locator("span.rank-points")
-
-                rank_count = await rank_elements.count()
-                rp_count = await rp_elements.count()
-
-                if rank_count > 0 and rp_count > 0:
-                    rank_text = await rank_elements.first.inner_text()
-                    rp_text = await rp_elements.first.inner_text()
-                    rp_full = f"{rp_text} RP"
-                else:
-                    rank_text = "Unranked"
-                    rp_full = "N/A"
+                rank_text = await page.locator("div.grid span.truncate").first.inner_text()
+                rp_text = await page.locator("span.rank-points").first.inner_text()
+                rp_full = f"{rp_text} RP"
             except Exception as e:
                 print("Rank fetch error:", e)
                 rank_text = "Unranked"
                 rp_full = "N/A"
-
-            rank_text = await page.locator("div.grid span.truncate").first.inner_text()
-            rp_text = await page.locator("span.rank-points").first.inner_text()
-            rp_full = f"{rp_text} RP"
 
             await browser.close()
 
@@ -707,19 +708,23 @@ async def r6stats(ctx, username: str):
         standard_kd, standard_win = extract_mode_stats("Standard")
         quick_kd, quick_win = extract_mode_stats("Quick Match")
 
-        # build message
-        msg = f"**🔫 Rainbow Six Siege Stats for `{username}`**\n"
-        msg += f"🏅 **Current Rank**: {rank} ({rp})\n\n"
-        msg += f"📊 **Ranked**\n• KD: {ranked_kd} | Win Rate: {ranked_win}\n"
-        msg += f"🎯 **Standard**\n• KD: {standard_kd} | Win Rate: {standard_win}\n"
-        msg += f"💥 **Quick Match**\n• KD: {quick_kd} | Win Rate: {quick_win}\n"
-        msg += f"\n🔗 [Full Stats](https://r6.tracker.network/r6siege/profile/ubi/{username}/overview)"
+        embed = discord.Embed(
+            title=f"🔫 Rainbow Six Siege Stats: {username}",
+            description=f"[View Full Stats](https://r6.tracker.network/r6siege/profile/ubi/{username}/overview)",
+            color=discord.Color.blurple()
+        )
 
-        await ctx.send(msg)
+        embed.add_field(name="🏅 Current Rank", value=f"{rank} ({rp})", inline=False)
+        embed.add_field(name="📊 Ranked", value=f"KD: {ranked_kd} | Win Rate: {ranked_win}", inline=False)
+        embed.add_field(name="🎯 Standard", value=f"KD: {standard_kd} | Win Rate: {standard_win}", inline=False)
+        embed.add_field(name="💥 Quick Match", value=f"KD: {quick_kd} | Win Rate: {quick_win}", inline=False)
+
+        await ctx.send(embed=embed)
 
     except Exception as e:
         print("R6 scrape error:", e)
         await ctx.send("❌ Failed to fetch R6 stats. Check the username/platform or try again later.")
+
 
 #---------SKYBLOCK----------#
 @bot.command(name="skyblock")
@@ -764,23 +769,10 @@ async def skyblock(ctx, username: str, profile_name: str = None):
     member_data = members.get(uuid_stripped, {})
     profile_label = selected.get("cute_name", "Unknown")
 
-    # networth
-    # try:
-    #     skycrypt_url = f"https://sky.shiiyu.moe/api/v2/profile/{uuid_stripped}"
-    #     skycrypt_res = requests.get(skycrypt_url)
-    #     print("SkyCrypt raw response:", skycrypt_res.status_code, skycrypt_res.text[:200])  # Print first 200 chars
-    #     skycrypt_data = skycrypt_res.json()
-    #     networth = skycrypt_data.get("networth", {}).get("networth", 0)
-    # except Exception as e:
-    #     print("Failed to get SkyCrypt net worth:", e)
-    #     networth = None
-
-    # Stats
     purse = member_data.get("currencies", {}).get("coin_purse", 0)
     bank = selected.get("bank_account", 0)
     fairy_souls = member_data.get("fairy_soul", {}).get("total_collected", 0)
 
-    # Skills
     xp = member_data.get("player_data", {}).get("experience", {})
 
     combat_level = xp_to_level(xp.get("SKILL_COMBAT", 0))
@@ -795,9 +787,7 @@ async def skyblock(ctx, username: str, profile_name: str = None):
     social_level = xp_to_level(xp.get("SKILL_SOCIAL", 0))
     runecrafting_level = xp_to_level(xp.get("SKILL_RUNECRAFTING", 0))
 
-    # Slayer
     slayer_data = member_data.get("slayer", {}).get("slayer_bosses", {})
-
     zombie_xp = slayer_data.get("zombie", {}).get("xp", 0)
     spider_xp = slayer_data.get("spider", {}).get("xp", 0)
     wolf_xp = slayer_data.get("wolf", {}).get("xp", 0)
@@ -806,27 +796,34 @@ async def skyblock(ctx, username: str, profile_name: str = None):
     spider_level = slayer_xp_to_level(spider_xp)
     wolf_level = slayer_xp_to_level(wolf_xp)
 
-    # Build message
-    msg = f"**🧱 SkyBlock Stats for `{username}` (Profile: {profile_label})**\n"
-    msg += f"• 💰 Purse: {purse:,.0f} coins\n"
-    msg += f"• 🏦 Bank: {bank if isinstance(bank, str) else f'{bank:,.0f}'} coins\n"
-    msg += f"• 🧚 Fairy Souls: {fairy_souls}\n"
-    msg += f"• ⚔️ Combat Level: {combat_level}\n"
-    msg += f"• 🌾 Farming Level: {farming_level}\n"
-    msg += f"• ⛏ Mining Level: {mining_level}\n"
-    msg += f"• 🪵 Foraging Level: {foraging_level}\n"
-    msg += f"• 🎣 Fishing Level: {fishing_level}\n"
-    msg += f"• 📚 Enchanting Level: {enchanting_level}\n"
-    msg += f"• 🧠 Alchemy Level: {alchemy_level}\n"
-    msg += f"• 🐕 Taming Level: {taming_level}\n"
-    msg += f"• 🛠 Carpentry Level: {carpentry_level}\n"
-    msg += f"• 🧑‍🤝‍🧑 Social Level: {social_level}\n"
-    msg += f"• ✨ Runecrafting Level: {runecrafting_level}\n"
-    msg += f"• 🧟 Zombie Slayer: Level {zombie_level}\n"
-    msg += f"• 🕷 Spider Slayer: Level {spider_level}\n"
-    msg += f"• 🐺 Wolf Slayer: Level {wolf_level}\n"
-    msg += f"🔗 View full profile: https://sky.shiiyu.moe/stats/{username}/{profile_label}\n"
+    embed = discord.Embed(
+        title=f"🧱 SkyBlock Stats for {username}",
+        description=f"Profile: `{profile_label}`",
+        color=discord.Color.gold()
+    )
+    embed.add_field(name="💰 Purse", value=f"{purse:,.0f} coins", inline=True)
+    embed.add_field(name="🏦 Bank", value=f"{bank if isinstance(bank, str) else f'{bank:,.0f}'} coins", inline=True)
+    embed.add_field(name="🧚 Fairy Souls", value=str(fairy_souls), inline=True)
 
-    await ctx.send(msg)
+    embed.add_field(name="⚔️ Combat", value=str(combat_level), inline=True)
+    embed.add_field(name="🌾 Farming", value=str(farming_level), inline=True)
+    embed.add_field(name="⛏ Mining", value=str(mining_level), inline=True)
+    embed.add_field(name="🪵 Foraging", value=str(foraging_level), inline=True)
+    embed.add_field(name="🎣 Fishing", value=str(fishing_level), inline=True)
+    embed.add_field(name="📚 Enchanting", value=str(enchanting_level), inline=True)
+    embed.add_field(name="🧠 Alchemy", value=str(alchemy_level), inline=True)
+    embed.add_field(name="🐕 Taming", value=str(taming_level), inline=True)
+    embed.add_field(name="🛠 Carpentry", value=str(carpentry_level), inline=True)
+    embed.add_field(name="🧑‍🤝‍🧑 Social", value=str(social_level), inline=True)
+    embed.add_field(name="✨ Runecrafting", value=str(runecrafting_level), inline=True)
+
+    embed.add_field(name="🧟 Zombie Slayer", value=f"Level {zombie_level}", inline=True)
+    embed.add_field(name="🕷 Spider Slayer", value=f"Level {spider_level}", inline=True)
+    embed.add_field(name="🐺 Wolf Slayer", value=f"Level {wolf_level}", inline=True)
+
+    embed.add_field(name="🔗 SkyCrypt", value=f"[View Full Profile](https://sky.shiiyu.moe/stats/{username}/{profile_label})", inline=False)
+
+    await ctx.send(embed=embed)
+
 
 bot.run(DISCOD_BOT_TOKEN)
