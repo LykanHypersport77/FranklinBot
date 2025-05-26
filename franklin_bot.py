@@ -264,14 +264,18 @@ async def fm(ctx, username: str = None):
         await ctx.send(f"⚠️ No recent tracks found for `{username}`.")
         return
 
-    msg = f"🎶 **Top Tracks This Week for `{username}`:**\n"
+    embed = discord.Embed(
+        title=f"🎶 Top Tracks This Week for {username}",
+        color=discord.Color.purple()
+    )
+
     for i, track in enumerate(tracks):
         name = track["name"]
         artist = track["artist"]["name"]
         playcount = track["playcount"]
-        msg += f"{i+1}. {name} – {artist} ({playcount} plays)\n"
+        embed.add_field(name=f"{i+1}. {name}", value=f"Artist: {artist} — {playcount} plays", inline=False)
 
-    await ctx.send(msg)
+    await ctx.send(embed=embed)
 
 @bot.command(name="fm", description="Show now playing or last played track from Last.fm")
 async def lastfm_nowplaying(ctx, target_username: str = None):
@@ -290,11 +294,8 @@ async def lastfm_nowplaying(ctx, target_username: str = None):
 
     if target_username:
         username = target_username
-        display_name = target_username  # Use queried Last.fm name
+        display_name = target_username
     else:
-        if user_id not in user_links:
-            await ctx.send("⚠️ You haven’t linked your Last.fm account. Use `-linkfm <username>`.")
-            return
         username = user_links[user_id]
         display_name = ctx.author.display_name
 
@@ -316,12 +317,21 @@ async def lastfm_nowplaying(ctx, target_username: str = None):
     title = track.get("name", "Unknown Track")
     album = track.get("album", {}).get("#text", "Unknown Album")
     now_playing = track.get("@attr", {}).get("nowplaying", "false") == "true"
+    image_url = track.get("image", [{}])[-1].get("#text", "")
 
-    if now_playing:
-        msg = f"🎧 {display_name} is currently listening to:\n**{title}** by *{artist}* (Album: {album})"
-    else:
-        msg = f"🎶 Last played by {display_name}:\n**{title}** by *{artist}* (Album: {album})"
-    await ctx.send(msg)
+    embed = discord.Embed(
+        title="🎧 Now Playing" if now_playing else "🎶 Last Played",
+        description=f"**{title}** by *{artist}*",
+        color=discord.Color.blue()
+    )
+    embed.set_author(name=display_name)
+    embed.add_field(name="Album", value=album, inline=True)
+    embed.add_field(name="Last.fm", value=f"[View on Last.fm](https://www.last.fm/user/{username})", inline=True)
+    if image_url:
+        embed.set_thumbnail(url=image_url)
+
+    await ctx.send(embed=embed)
+
 
 #-------STEAM GAMES-----------#
 @bot.command(name="linksteam")
