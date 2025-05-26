@@ -24,6 +24,7 @@ HYPIXEL_API_KEY = os.getenv("HYPIXEL_API_KEY")
 LASTFM_API_KEY = os.getenv("FM_API_KEY")
 
 LASTFM_LINK_FILE = "lastfm_links.json"
+GHOST_JSON_PATH = "phasmophobia_ghosts.json"
 
 if os.path.exists(LASTFM_LINK_FILE):
     with open(LASTFM_LINK_FILE, "r") as f:
@@ -735,6 +736,36 @@ async def r6stats(ctx, username: str):
         print("R6 scrape error:", e)
         await ctx.send("❌ Failed to fetch R6 stats. Check the username/platform or try again later.")
 
+#---------PHASMOPHOBIA--------#
+if os.path.exists(GHOST_JSON_PATH):
+    with open(GHOST_JSON_PATH, "r") as f:
+        PHAS_GHOSTS = json.load(f)
+else:
+    PHAS_GHOSTS = {}
+
+@bot.command(name="phas")
+async def phas(ctx, *, ghost_name: str = None):
+    if not ghost_name:
+        await ctx.send("👻 Please specify a ghost name. Example: `-phas hantu`")
+        return
+
+    ghost_key = ghost_name.lower().strip()
+    ghost = PHAS_GHOSTS.get(ghost_key)
+
+    if not ghost:
+        await ctx.send(f"❌ Unknown ghost type: `{ghost_name}`. Check your spelling.")
+        return
+
+    embed = discord.Embed(
+        title=f"👻 Phasmophobia Ghost Info: {ghost_key.title()}",
+        color=discord.Color.dark_teal()
+    )
+    embed.add_field(name="🔎 Evidence", value=", ".join(ghost["evidence"]), inline=False)
+    embed.add_field(name="💪 Strength", value=ghost["strength"], inline=False)
+    embed.add_field(name="⚠️ Weakness", value=ghost["weakness"], inline=False)
+    embed.add_field(name="🧠 Tips", value=ghost["info"], inline=False)
+
+    await ctx.send(embed=embed)
 
 #---------SKYBLOCK----------#
 @bot.command(name="skyblock")
