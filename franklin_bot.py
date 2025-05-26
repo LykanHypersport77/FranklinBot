@@ -337,20 +337,21 @@ async def lastfm_nowplaying(ctx, target_username: str = None):
 async def lyrics(ctx, username: str = None):
     user_id = str(ctx.author.id)
 
-    # Load linked Last.fm username
+    # Load linked Last.fm usernames
     if os.path.exists("lastfm_links.json"):
         with open("lastfm_links.json", "r") as f:
             user_links = json.load(f)
     else:
         user_links = {}
 
+    # Use linked username if none provided
     if not username:
         if user_id not in user_links:
             await ctx.send("⚠️ You haven’t linked your Last.fm account. Use `-linkfm <username>`.")
             return
         username = user_links[user_id]
 
-    # Step 1: Get now playing or last played track
+    # Get now playing or last played track
     url = f"http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user={username}&api_key={LASTFM_API_KEY}&format=json&limit=1"
     res = requests.get(url)
 
@@ -368,30 +369,30 @@ async def lyrics(ctx, username: str = None):
     artist = track.get("artist", {}).get("#text", "Unknown Artist")
     title = track.get("name", "Unknown Track")
 
-    # Step 2: Search for lyrics using lyrics.ovh
+    # Get lyrics
     lyrics_res = requests.get(f"https://api.lyrics.ovh/v1/{artist}/{title}")
-
     if lyrics_res.status_code != 200:
         await ctx.send(f"❌ Lyrics not found for **{title}** by *{artist}*.")
         return
 
-    lyrics = lyrics_res.json().get("lyrics", "Lyrics not available.")
-    lyrics = lyrics.strip()
+    lyrics = lyrics_res.json().get("lyrics", "Lyrics not available.").strip()
 
-    chunks = [lyrics[i:i+1024] for i in range(0, len(lyrics), 1024)]
-
-    for i, chunk in enumerate(chunks[:5]):  # Only show first 5 chunks (safe limit)
-        name = "Lyrics" if i == 0 else f"Part {i+1}"
-        embed.add_field(name=name, value=chunk, inline=False)
-
-    # Step 3: Send embed
+    # Build embed
     embed = discord.Embed(
         title=f"🎶 Lyrics for {title}",
         description=f"By {artist}",
         color=discord.Color.magenta()
     )
-    embed.add_field(name="Lyrics", value=lyrics, inline=False)
+
+    # Split lyrics into chunks of 1024 characters (Discord limit per field)
+    chunks = [lyrics[i:i+1024] for i in range(0, len(lyrics), 1024)]
+
+    for i, chunk in enumerate(chunks[:5]):  # Limit to first 5 parts
+        name = "Lyrics" if i == 0 else f"Part {i+1}"
+        embed.add_field(name=name, value=chunk, inline=False)
+
     await ctx.send(embed=embed)
+
 
 #-------STEAM GAMES-----------#
 @bot.command(name="linksteam")
