@@ -376,8 +376,13 @@ async def lyrics(ctx, username: str = None):
         return
 
     lyrics = lyrics_res.json().get("lyrics", "Lyrics not available.")
-    if len(lyrics) > 2000:
-        lyrics = lyrics[:1997] + "..."
+    lyrics = lyrics.strip()
+
+    chunks = [lyrics[i:i+1024] for i in range(0, len(lyrics), 1024)]
+
+    for i, chunk in enumerate(chunks[:5]):  # Only show first 5 chunks (safe limit)
+        name = "Lyrics" if i == 0 else f"Part {i+1}"
+        embed.add_field(name=name, value=chunk, inline=False)
 
     # Step 3: Send embed
     embed = discord.Embed(
@@ -919,5 +924,6 @@ async def skyblock(ctx, username: str, profile_name: str = None):
     embed.add_field(name="🔗 SkyCrypt", value=f"[View Full Profile](https://sky.shiiyu.moe/stats/{username}/{profile_label})", inline=False)
 
     await ctx.send(embed=embed)
+
 
 bot.run(DISCOD_BOT_TOKEN)
