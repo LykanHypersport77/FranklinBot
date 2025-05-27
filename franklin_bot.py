@@ -81,7 +81,7 @@ async def on_message(message):
 # -------- Commands --------
 @bot.command(name="bark")
 async def bark(ctx):
-    folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\benno pics"
+    folder = "/pics/benno_pics"
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No benno pics found")
@@ -92,7 +92,7 @@ async def bark(ctx):
 
 @bot.command(name="twink")
 async def twink(ctx):
-    folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\twink"
+    folder = "/pics/twink"
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No twink pics found")
@@ -103,7 +103,7 @@ async def twink(ctx):
 
 @bot.command(name="varun")
 async def varun(ctx):
-    folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\varun"
+    folder = "/pics/varun"
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No varun pics found")
@@ -114,7 +114,7 @@ async def varun(ctx):
 
 @bot.command(name="twins")
 async def twins(ctx):
-    folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\twins"
+    folder = "/pics/twins"
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No twin pics found")
@@ -125,7 +125,7 @@ async def twins(ctx):
 
 @bot.command(name="nate")
 async def nate(ctx):
-    folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\nate"
+    folder = "/pics/nate"
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No nate pics found")
@@ -136,7 +136,7 @@ async def nate(ctx):
 
 @bot.command(name="oppshoota")
 async def oppshoota(ctx):
-    folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\oppshoota"
+    folder = "/pics/oppshoota"
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No opps found")
@@ -147,7 +147,7 @@ async def oppshoota(ctx):
 
 @bot.command(name="meow")
 async def meow(ctx):
-    folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\sophie pics"
+    folder = "/pics/sophie_pics"
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No cat images found.")
@@ -163,7 +163,7 @@ async def meow(ctx):
 
 @bot.command(name="woof")
 async def woof(ctx):
-    folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\franklin pics"
+    folder = "/pics/franklin_pics"
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No dog images found.")
@@ -179,7 +179,7 @@ async def woof(ctx):
 
 @bot.command(name="bigbootylatina")
 async def bigbootylatina(ctx):
-    folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\big booty latina"
+    folder = r"/pics/big_booty_latina"
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No big booty latinas found.")
@@ -190,7 +190,7 @@ async def bigbootylatina(ctx):
 
 @bot.command(name="rangrang")
 async def rangrang(ctx):
-    folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\rangrang"
+    folder = "/pics/rangrang"
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No chinese found.")
@@ -201,7 +201,7 @@ async def rangrang(ctx):
 
 @bot.command(name="jesus")
 async def jesus(ctx):
-    folder = r"C:\Users\pkpq4127\Downloads\Franklin Bot\pics\jesus"
+    folder = "/pics/jesus"
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("jesus is dead")
