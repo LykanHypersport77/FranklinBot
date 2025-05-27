@@ -26,6 +26,7 @@ LASTFM_API_KEY = os.getenv("FM_API_KEY")
 LASTFM_LINK_FILE = "lastfm_links.json"
 GHOST_JSON_PATH = "phasmophobia_ghosts.json"
 
+cwd = os.getcwd()
 
 #----------Hypixel leveling----------#
 SKILL_XP_TABLE = [
@@ -81,7 +82,7 @@ async def on_message(message):
 # -------- Commands --------
 @bot.command(name="bark")
 async def bark(ctx):
-    folder = "/pics/benno_pics"
+    folder = os.path.join(cwd, 'pics', 'benno_pics')
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No benno pics found")
@@ -92,7 +93,7 @@ async def bark(ctx):
 
 @bot.command(name="twink")
 async def twink(ctx):
-    folder = "/pics/twink"
+    folder = os.path.join(cwd, 'pics', 'twink')
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No twink pics found")
@@ -103,7 +104,7 @@ async def twink(ctx):
 
 @bot.command(name="varun")
 async def varun(ctx):
-    folder = "/pics/varun"
+    folder = os.path.join(cwd, 'pics', 'varun')
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No varun pics found")
@@ -114,7 +115,7 @@ async def varun(ctx):
 
 @bot.command(name="twins")
 async def twins(ctx):
-    folder = "/pics/twins"
+    folder = os.path.join(cwd, 'pics', 'twins')
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No twin pics found")
@@ -125,7 +126,7 @@ async def twins(ctx):
 
 @bot.command(name="nate")
 async def nate(ctx):
-    folder = "/pics/nate"
+    folder = os.path.join(cwd, 'pics', 'nate')
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No nate pics found")
@@ -136,7 +137,7 @@ async def nate(ctx):
 
 @bot.command(name="oppshoota")
 async def oppshoota(ctx):
-    folder = "/pics/oppshoota"
+    folder = os.path.join(cwd, 'pics', 'oppshoota')
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No opps found")
@@ -147,7 +148,7 @@ async def oppshoota(ctx):
 
 @bot.command(name="meow")
 async def meow(ctx):
-    folder = "/pics/sophie_pics"
+    folder = os.path.join(cwd, 'pics', 'sophie_pics')
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No cat images found.")
@@ -163,7 +164,7 @@ async def meow(ctx):
 
 @bot.command(name="woof")
 async def woof(ctx):
-    folder = "/pics/franklin_pics"
+    folder = os.path.join(cwd, 'pics', 'franklin_pics')
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No dog images found.")
@@ -179,7 +180,7 @@ async def woof(ctx):
 
 @bot.command(name="bigbootylatina")
 async def bigbootylatina(ctx):
-    folder = r"/pics/big_booty_latina"
+    folder = os.path.join(cwd, 'pics', 'big_booty_latina')
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No big booty latinas found.")
@@ -190,7 +191,7 @@ async def bigbootylatina(ctx):
 
 @bot.command(name="rangrang")
 async def rangrang(ctx):
-    folder = "/pics/rangrang"
+    folder = os.path.join(cwd, 'pics', 'rangrang')
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("No chinese found.")
@@ -201,7 +202,7 @@ async def rangrang(ctx):
 
 @bot.command(name="jesus")
 async def jesus(ctx):
-    folder = "/pics/jesus"
+    folder = os.path.join(cwd, 'pics', 'jesus')
     images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
     if not images:
         await ctx.send("jesus is dead")
