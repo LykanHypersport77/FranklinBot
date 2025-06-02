@@ -824,7 +824,10 @@ async def phas(ctx, *, ghost_name: str = None):
     embed.add_field(name="🔎 Evidence", value=", ".join(ghost["evidence"]), inline=False)
     embed.add_field(name="💪 Strength", value=ghost["strength"], inline=False)
     embed.add_field(name="⚠️ Weakness", value=ghost["weakness"], inline=False)
-    embed.add_field(name="🧠 Tips", value=ghost["info"], inline=False)
+    embed.add_field(name="🧠 Tips/Fun Facts", value=ghost["info"], inline=False)
+
+    speed = ghost.get("speed", "Unknown")
+    embed.add_field(name="🏃 Speed", value=speed, inline=False)
 
     await ctx.send(embed=embed)
 
