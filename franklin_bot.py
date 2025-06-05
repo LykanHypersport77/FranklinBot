@@ -941,40 +941,67 @@ def fetch_bazaar_data():
     data = response.json()
     return data.get("products", {})
 
-# Dropdown
-class BZDropdown(discord.ui.Select):
-    def __init__(self, products):
-        options = [
-            discord.SelectOption(label=item)
-            for item in list(products.keys())[:25]
-        ]
-        super().__init__(placeholder="Choose a Bazaar item...", options=options)
+# View with buttons
+class BazaarView(discord.ui.View):
+    def __init__(self, products, page=0):
+        super().__init__(timeout=60)
         self.products = products
+        self.page = page
+        self.per_page = 10  # Number of items per page (adjust as needed)
 
-    async def callback(self, interaction: discord.Interaction):
-        item = self.values[0]
-        item_data = self.products.get(item, {}).get("quick_status", {})
-        buy_price = item_data.get("buyPrice", 0)
-        sell_price = item_data.get("sellPrice", 0)
-        buy_volume = item_data.get("buyVolume", 0)
-        sell_volume = item_data.get("sellVolume", 0)
+        keys = list(products.keys())
+        start = page * self.per_page
+        end = start + self.per_page
+        self.items_list = keys[start:end]
 
-        embed = discord.Embed(
-            title=f"📊 Bazaar Item: {item}",
-            description=(
-                f"**Buy Price:** {buy_price:.2f}\n"
-                f"**Sell Price:** {sell_price:.2f}\n"
-                f"**Buy Volume:** {buy_volume}\n"
-                f"**Sell Volume:** {sell_volume}"
-            ),
-            color=discord.Color.blue()
-        )
-        await interaction.response.edit_message(embed=embed, view=None)
+        for item in self.items_list:
+            button = discord.ui.Button(label=item[:80], style=discord.ButtonStyle.primary)
+            button.callback = self.make_callback(item)
+            self.add_item(button)
 
-class BZView(discord.ui.View):
-    def __init__(self, products):
-        super().__init__()
-        self.add_item(BZDropdown(products))
+        if start > 0:
+            prev = discord.ui.Button(label="⬅️ Prev", style=discord.ButtonStyle.secondary)
+            prev.callback = self.make_nav_callback(page - 1)
+            self.add_item(prev)
+
+        if end < len(keys):
+            next = discord.ui.Button(label="➡️ Next", style=discord.ButtonStyle.secondary)
+            next.callback = self.make_nav_callback(page + 1)
+            self.add_item(next)
+
+    def make_callback(self, item_name):
+        async def callback(interaction: discord.Interaction):
+            item_data = self.products.get(item_name, {}).get("quick_status", {})
+            buy_price = item_data.get("buyPrice", 0)
+            sell_price = item_data.get("sellPrice", 0)
+            buy_volume = item_data.get("buyVolume", 0)
+            sell_volume = item_data.get("sellVolume", 0)
+
+            embed = discord.Embed(
+                title=f"📊 Bazaar Item: {item_name}",
+                description=(
+                    f"**Buy Price:** {buy_price:.2f}\n"
+                    f"**Sell Price:** {sell_price:.2f}\n"
+                    f"**Buy Volume:** {buy_volume}\n"
+                    f"**Sell Volume:** {sell_volume}"
+                ),
+                color=discord.Color.blue()
+            )
+            # Add a placeholder image; if you have real item icons, replace this with their URLs!
+            embed.set_thumbnail(url="https://hypixel.net/styles/hypixel-v2/images/favicon-96x96.png")
+            await interaction.response.edit_message(embed=embed, view=self)
+        return callback
+
+    def make_nav_callback(self, target_page):
+        async def callback(interaction: discord.Interaction):
+            new_view = BazaarView(self.products, page=target_page)
+            embed = discord.Embed(
+                title=f"🛒 Hypixel SkyBlock Bazaar (Page {target_page + 1})",
+                description="Click an item button to view details.",
+                color=discord.Color.gold()
+            )
+            await interaction.response.edit_message(embed=embed, view=new_view)
+        return callback
 
 # Command
 @bot.command(name="bz")
@@ -986,10 +1013,10 @@ async def bz(ctx):
 
     embed = discord.Embed(
         title="🛒 Hypixel SkyBlock Bazaar",
-        description="Select an item below to see details.",
+        description="Click an item button to view details.",
         color=discord.Color.gold()
     )
-    view = BZView(products)
+    view = BazaarView(products)
     await ctx.send(embed=embed, view=view)
-    
+
 bot.run(DISCOD_BOT_TOKEN)
