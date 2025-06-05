@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 import datetime
 import tempfile
+from discord import app_commands, Interaction, SelectOption, SelectMenu, Embed
 
 load_dotenv()
 
@@ -929,6 +930,62 @@ async def skyblock(ctx, username: str, profile_name: str = None):
     embed.add_field(name="🔗 SkyCrypt", value=f"[View Full Profile](https://sky.shiiyu.moe/stats/{username}/{profile_label})", inline=False)
 
     await ctx.send(embed=embed)
+#-------------Bazaar----------#
+
+def fetch_bazaar_data():
+    url = f"https://api.hypixel.net/skyblock/bazaar?key={HYPIXEL_API_KEY}"
+    response = requests.get(url)
+    if response.status_code != 200:
+        return None
+    data = response.json()
+    return data.get("products", {})
+
+class BZDropdown(discord.ui.Select):
+    def __init__(self, products):
+        options = [
+            SelectOption(label=item, description="Click to see details")
+            for item in list(products.keys())[:25]  # Discord limit: 25 options
+        ]
+        super().__init__(placeholder="Choose a Bazaar item...", min_values=1, max_values=1, options=options)
+        self.products = products
+
+    async def callback(self, interaction: Interaction):
+        item = self.values[0]
+        item_data = self.products.get(item, {}).get("quick_status", {})
+        buy_price = item_data.get("buyPrice", 0)
+        sell_price = item_data.get("sellPrice", 0)
+        buy_volume = item_data.get("buyVolume", 0)
+        sell_volume = item_data.get("sellVolume", 0)
+
+        embed = Embed(
+            title=f"📊 Bazaar Item: {item}",
+            description=f"**Buy Price:** {buy_price:.2f}\n"
+                        f"**Sell Price:** {sell_price:.2f}\n"
+                        f"**Buy Volume:** {buy_volume}\n"
+                        f"**Sell Volume:** {sell_volume}",
+            color=discord.Color.blue()
+        )
+        await interaction.response.edit_message(embed=embed, view=None)
+
+class BZView(discord.ui.View):
+    def __init__(self, products):
+        super().__init__()
+        self.add_item(BZDropdown(products))
+
+@bot.command(name="bz")
+async def bz(ctx):
+    products = fetch_bazaar_data()
+    if not products:
+        await ctx.send("❌ Failed to fetch Bazaar data.")
+        return
+
+    embed = Embed(
+        title="🛒 Hypixel SkyBlock Bazaar",
+        description="Select an item below to see details.",
+        color=discord.Color.gold()
+    )
+    view = BZView(products)
+    await ctx.send(embed=embed, view=view)
 
 
 bot.run(DISCOD_BOT_TOKEN)
