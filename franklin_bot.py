@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 import datetime
 import tempfile
-from discord import app_commands, Interaction, SelectOption, SelectMenu, Embed
+from discord import SelectOption, Embed
+
 
 load_dotenv()
 
@@ -940,16 +941,17 @@ def fetch_bazaar_data():
     data = response.json()
     return data.get("products", {})
 
+# Dropdown
 class BZDropdown(discord.ui.Select):
     def __init__(self, products):
         options = [
-            SelectOption(label=item, description="Click to see details")
-            for item in list(products.keys())[:25]  # Discord limit: 25 options
+            discord.SelectOption(label=item)
+            for item in list(products.keys())[:25]
         ]
-        super().__init__(placeholder="Choose a Bazaar item...", min_values=1, max_values=1, options=options)
+        super().__init__(placeholder="Choose a Bazaar item...", options=options)
         self.products = products
 
-    async def callback(self, interaction: Interaction):
+    async def callback(self, interaction: discord.Interaction):
         item = self.values[0]
         item_data = self.products.get(item, {}).get("quick_status", {})
         buy_price = item_data.get("buyPrice", 0)
@@ -957,12 +959,14 @@ class BZDropdown(discord.ui.Select):
         buy_volume = item_data.get("buyVolume", 0)
         sell_volume = item_data.get("sellVolume", 0)
 
-        embed = Embed(
+        embed = discord.Embed(
             title=f"📊 Bazaar Item: {item}",
-            description=f"**Buy Price:** {buy_price:.2f}\n"
-                        f"**Sell Price:** {sell_price:.2f}\n"
-                        f"**Buy Volume:** {buy_volume}\n"
-                        f"**Sell Volume:** {sell_volume}",
+            description=(
+                f"**Buy Price:** {buy_price:.2f}\n"
+                f"**Sell Price:** {sell_price:.2f}\n"
+                f"**Buy Volume:** {buy_volume}\n"
+                f"**Sell Volume:** {sell_volume}"
+            ),
             color=discord.Color.blue()
         )
         await interaction.response.edit_message(embed=embed, view=None)
@@ -972,6 +976,7 @@ class BZView(discord.ui.View):
         super().__init__()
         self.add_item(BZDropdown(products))
 
+# Command
 @bot.command(name="bz")
 async def bz(ctx):
     products = fetch_bazaar_data()
@@ -979,13 +984,12 @@ async def bz(ctx):
         await ctx.send("❌ Failed to fetch Bazaar data.")
         return
 
-    embed = Embed(
+    embed = discord.Embed(
         title="🛒 Hypixel SkyBlock Bazaar",
         description="Select an item below to see details.",
         color=discord.Color.gold()
     )
     view = BZView(products)
     await ctx.send(embed=embed, view=view)
-
-
+    
 bot.run(DISCOD_BOT_TOKEN)
