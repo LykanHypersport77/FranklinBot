@@ -1052,24 +1052,52 @@ async def nasa_apod(ctx):
     msg += f"\n📎 Image: {image_url}"
     await ctx.send(msg)
 
-@bot.command(name="earthimage")
+@bot.command(name="earth")
 async def earthimage(ctx, latitude: float, longitude: float):
-    url = "https://api.nasa.gov/planetary/earth/imagery"
-    params = {
+    import random
+    from datetime import datetime, timedelta
+
+    # Step 1: Find available dates from assets endpoint
+    asset_url = "https://api.nasa.gov/planetary/earth/assets"
+    asset_params = {
         "lat": latitude,
         "lon": longitude,
-        "date": "2022-01-01",  # You can make this dynamic if you want
-        "dim": 0.1,            # Image width/height in degrees (~11km at equator)
         "api_key": NASA_API_KEY
     }
 
-    res = requests.get(url, params=params)
-    if res.status_code == 200:
-        image_url = res.url  # NASA redirects to actual image
-        await ctx.send(f"🛰️ Earth image for lat `{latitude}`, lon `{longitude}`:\n{image_url}")
-    elif res.status_code == 400:
-        await ctx.send("⚠️ No imagery available for this location and date.")
-    else:
-        await ctx.send("❌ Failed to fetch Earth image. Try again later.")
+    asset_res = requests.get(asset_url, params=asset_params)
+    if asset_res.status_code != 200 or not asset_res.json().get("results"):
+        await ctx.send("⚠️ No available imagery for this location.")
+        return
+
+    available_dates = [entry["date"][:10] for entry in asset_res.json()["results"]]
+
+    if not available_dates:
+        await ctx.send("⚠️ No imagery dates available.")
+        return
+
+    # Choose 5 random dates to try
+    try_dates = random.sample(available_dates, min(5, len(available_dates)))
+
+    # Step 2: Try each date until image is found
+    image_url = "https://api.nasa.gov/planetary/earth/imagery"
+    for date in try_dates:
+        image_params = {
+            "lat": latitude,
+            "lon": longitude,
+            "date": date,
+            "dim": 0.1,
+            "api_key": NASA_API_KEY
+        }
+        image_res = requests.get(image_url, params=image_params)
+        if image_res.status_code == 200:
+            final_url = image_res.url
+            await ctx.send(
+                f"📍 Earth Image for lat `{latitude}`, lon `{longitude}`\n🗓️ Date: `{date}`\n{final_url}"
+            )
+            return
+
+    await ctx.send("❌ Tried multiple dates but could not retrieve an image.")
+
 
 bot.run(DISCOD_BOT_TOKEN)
