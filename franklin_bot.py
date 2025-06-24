@@ -24,6 +24,7 @@ STEAM_API_KEY = os.getenv("STEAM_API_KEY")
 DISCOD_BOT_TOKEN = os.getenv("DISCOD_BOT_TOKEN")
 HYPIXEL_API_KEY = os.getenv("HYPIXEL_API_KEY")
 LASTFM_API_KEY = os.getenv("FM_API_KEY")
+NASA_API_KEY = os.getenv("NASA_API_KEY")
 
 LASTFM_LINK_FILE = "lastfm_links.json"
 GHOST_JSON_PATH = "phasmophobia_ghosts.json"
@@ -1018,5 +1019,37 @@ async def bz(ctx):
     )
     view = BazaarView(products)
     await ctx.send(embed=embed, view=view)
+
+
+#-------------NASA------------------#
+
+@bot.command(name="apod", help="Get NASA's Astronomy Picture of the Day")
+async def nasa_apod(ctx):
+    url = f"https://api.nasa.gov/planetary/apod?api_key={NASA_API_KEY}"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        await ctx.send("❌ Failed to fetch data from NASA. Try again later.")
+        return
+
+    data = response.json()
+    title = data.get("title", "No Title")
+    explanation = data.get("explanation", "No description available.")
+    image_url = data.get("url", "")
+    media_type = data.get("media_type", "")
+
+    embed = discord.Embed(
+        title=f"🌌 NASA Picture of the Day: {title}",
+        description=(explanation[:1021] + "...") if len(explanation) > 1024 else explanation,
+        color=discord.Color.dark_blue()
+    )
+    embed.set_footer(text=f"Date: {data.get('date', 'Unknown')} | Source: NASA")
+
+    if media_type == "image":
+        embed.set_image(url=image_url)
+    else:
+        embed.add_field(name="Media Link", value=image_url, inline=False)
+
+    await ctx.send(embed=embed)
 
 bot.run(DISCOD_BOT_TOKEN)
