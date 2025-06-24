@@ -1043,13 +1043,14 @@ async def nasa_apod(ctx):
         description=(explanation[:1021] + "...") if len(explanation) > 1024 else explanation,
         color=discord.Color.dark_blue()
     )
-    embed.set_footer(text=f"Date: {data.get('date', 'Unknown')} | Source: NASA")
+    embed.set_footer(text=f"Date: {data.get('date', 'Unknown')} | Media Type: {media_type.upper()} | Source: NASA")
 
     if media_type == "image":
         embed.set_image(url=image_url)
     else:
-        embed.add_field(name="Media Link", value=image_url, inline=False)
-
+        # For videos or other media, add a clickable link instead
+        embed.add_field(name="🎥 Media Content", value=f"[Click to view video]({image_url})", inline=False)
+        embed.set_thumbnail(url="https://www.nasa.gov/sites/default/files/thumbnails/image/nasa-logo-web-rgb.png")
     await ctx.send(embed=embed)
 
 bot.run(DISCOD_BOT_TOKEN)
