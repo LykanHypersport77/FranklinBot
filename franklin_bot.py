@@ -1051,3 +1051,5 @@ async def nasa_apod(ctx):
     # fallback
     msg += f"\n📎 Image: {image_url}"
     await ctx.send(msg)
+
+bot.run(DISCOD_BOT_TOKEN)
