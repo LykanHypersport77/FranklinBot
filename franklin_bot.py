@@ -1086,7 +1086,7 @@ async def earthimage(ctx, latitude: float, longitude: float):
             "lat": latitude,
             "lon": longitude,
             "date": date,
-            "dim": 0.1,
+            "dim": 0.3,
             "api_key": NASA_API_KEY
         }
         image_res = requests.get(image_url, params=image_params)
