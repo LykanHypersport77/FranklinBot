@@ -1034,23 +1034,18 @@ async def nasa_apod(ctx):
     data = res.json()
     title = data.get("title", "NASA Picture of the Day")
     explanation = data.get("explanation", "No explanation provided.")
-    image_url = data.get("hdurl") or data.get("url")  # hdurl preferred
+    image_url = data.get("hdurl") or data.get("url")
     media_type = data.get("media_type", "image")
     date = data.get("date", "Unknown")
 
-    embed = discord.Embed(
-        title=f"🪐 NASA Picture of the Day: {title}",
-        description=explanation[:4000],  # Discord max embed description length
-        color=discord.Color.blue()
-    )
-    embed.set_footer(text=f"Date: {date} | Media Type: {media_type.upper()} | Source: NASA")
+    print("APOD Media Type:", media_type)
+    print("APOD URL:", image_url)
 
-    if media_type == "image":
-        embed.set_image(url=image_url)
-    else:
-        embed.add_field(name="🎥 Video Content", value=f"[Watch here]({image_url})", inline=False)
-        embed.set_thumbnail(url="https://www.nasa.gov/sites/default/files/thumbnails/image/nasa-logo-web-rgb.png")
+    message = f"🌌 **NASA Picture of the Day** ({date})\n"
+    message += f"**{title}**\n\n"
+    message += f"{explanation[:1500]}...\n\n"  # Trimmed explanation for readability
+    message += f"{'🖼️ Image:' if media_type == 'image' else '🎥 Video:'} {image_url}"
 
-    await ctx.send(embed=embed)
+    await ctx.send(message)
 
 bot.run(DISCOD_BOT_TOKEN)
