@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import datetime
 import tempfile
 from discord import SelectOption, Embed
+from io import BytesIO
 
 
 load_dotenv()
@@ -1035,17 +1036,18 @@ async def nasa_apod(ctx):
     title = data.get("title", "NASA Picture of the Day")
     explanation = data.get("explanation", "No explanation provided.")
     image_url = data.get("hdurl") or data.get("url")
-    media_type = data.get("media_type", "image")
     date = data.get("date", "Unknown")
 
-    print("APOD Media Type:", media_type)
-    print("APOD URL:", image_url)
+    msg = f"🌌 **NASA Picture of the Day** ({date})\n**{title}**\n\n{explanation[:1500]}..."
 
-    message = f"🌌 **NASA Picture of the Day** ({date})\n"
-    message += f"**{title}**\n\n"
-    message += f"{explanation[:1500]}...\n\n"  # Trimmed explanation for readability
-    message += f"{'🖼️ Image:' if media_type == 'image' else '🎥 Video:'} {image_url}"
+    # Only proceed if it's an image
+    if image_url.endswith((".jpg", ".png", ".jpeg")):
+        img_res = requests.get(image_url)
+        if img_res.status_code == 200:
+            file = discord.File(BytesIO(img_res.content), filename="apod.jpg")
+            await ctx.send(content=msg, file=file)
+            return
 
-    await ctx.send(message)
-
-bot.run(DISCOD_BOT_TOKEN)
+    # fallback
+    msg += f"\n📎 Image: {image_url}"
+    await ctx.send(msg)
