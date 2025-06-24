@@ -1058,6 +1058,8 @@ async def earthimage(ctx, latitude: float, longitude: float):
     asset_params = {
         "lat": latitude,
         "lon": longitude,
+        "date": datetime.utcnow().strftime("%Y-%m-%d"),  # REQUIRED
+        "dim": 0.3,
         "api_key": NASA_API_KEY
     }
 
@@ -1078,9 +1080,9 @@ async def earthimage(ctx, latitude: float, longitude: float):
         [datetime.fromisoformat(item["date"]) for item in asset_data["results"]],
         reverse=True
     )
-    formatted_dates = [d.strftime('%Y-%m-%d') for d in available_dates[:5]]  # Try the 5 newest
+    formatted_dates = [d.strftime('%Y-%m-%d') for d in available_dates[:5]]  # Try 5 newest
 
-    # Try each date until we get a valid image
+    # Try each date until one succeeds
     for date in formatted_dates:
         image_url = "https://api.nasa.gov/planetary/earth/imagery"
         image_params = {
@@ -1098,7 +1100,6 @@ async def earthimage(ctx, latitude: float, longitude: float):
             )
             return
 
-    await ctx.send("❌ Could not retrieve any imagery from NASA for the latest available dates.")
-
-
+    await ctx.send("Could not retrieve any imagery from NASA for the latest available dates.")
+    
 bot.run(DISCOD_BOT_TOKEN)
