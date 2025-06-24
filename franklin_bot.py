@@ -1062,7 +1062,12 @@ async def earthimage(ctx, latitude: float, longitude: float):
     }
 
     asset_res = requests.get(asset_url, params=asset_params)
-    asset_data = asset_res.json()
+
+    try:
+        asset_data = asset_res.json()
+    except Exception as e:
+        await ctx.send("❌ Could not parse NASA's response. Possibly rate-limited or bad coordinates.")
+        return
 
     if asset_res.status_code != 200 or "results" not in asset_data or not asset_data["results"]:
         await ctx.send("⚠️ No available imagery dates for this location.")
