@@ -1052,4 +1052,40 @@ async def nasa_apod(ctx):
     msg += f"\n📎 Image: {image_url}"
     await ctx.send(msg)
 
+@bot.command(name="earth")
+async def earthimage(ctx, latitude: float, longitude: float):
+    # Step 1: Find latest available date
+    asset_url = "https://api.nasa.gov/planetary/earth/assets"
+    asset_params = {
+        "lat": latitude,
+        "lon": longitude,
+        "api_key": NASA_API_KEY
+    }
+
+    asset_res = requests.get(asset_url, params=asset_params)
+    if asset_res.status_code != 200 or "date" not in asset_res.json():
+        await ctx.send("⚠️ No available imagery for this location.")
+        return
+
+    latest_date = asset_res.json()["date"][:10]  # Only keep YYYY-MM-DD
+
+    # Step 2: Request image from the latest date
+    image_url = "https://api.nasa.gov/planetary/earth/imagery"
+    image_params = {
+        "lat": latitude,
+        "lon": longitude,
+        "date": latest_date,
+        "dim": 0.1,  # Controls zoom level (0.1 ~= 11km square at equator)
+        "api_key": NASA_API_KEY
+    }
+
+    image_res = requests.get(image_url, params=image_params)
+    if image_res.status_code == 200:
+        final_url = image_res.url
+        await ctx.send(
+            f"📍 Earth Image for lat `{latitude}`, lon `{longitude}`\n🗓️ Date: `{latest_date}`\n{final_url}"
+        )
+    else:
+        await ctx.send("❌ Failed to retrieve image from NASA.")
+
 bot.run(DISCOD_BOT_TOKEN)
