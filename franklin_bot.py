@@ -1058,7 +1058,7 @@ async def earthimage(ctx, latitude: float, longitude: float):
     asset_params = {
         "lat": latitude,
         "lon": longitude,
-        "date": datetime.utcnow().strftime("%Y-%m-%d"),  # REQUIRED
+        "date": datetime.datetime.now().strftime("%Y-%m-%d"),  # REQUIRED
         "dim": 0.3,
         "api_key": NASA_API_KEY
     }
