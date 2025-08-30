@@ -10,7 +10,7 @@ import datetime
 import tempfile
 from discord import SelectOption, Embed
 from io import BytesIO
-
+from playwright.async_api import async_playwright
 
 load_dotenv()
 
