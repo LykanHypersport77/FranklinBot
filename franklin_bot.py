@@ -725,7 +725,8 @@ async def cs2(ctx, steam_id: str = None):
 #---------R6---------------#
 @bot.command(name="r6")
 async def r6stats(ctx, username: str):
-    from playwright.async_api import async_playwright
+    # A "thinking" message lets the user know the bot is working
+    message = await ctx.send(f"🔍 Looking up stats for **{username}**...")
 
     async def scrape_r6_stats(username):
         url = f"https://r6.tracker.network/r6siege/profile/ubi/{username}/overview"
@@ -741,67 +742,77 @@ async def r6stats(ctx, username: str):
             )
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                viewport={"width": 1280, "height": 800},
                 locale="en-US"
             )
             page = await context.new_page()
-            await page.goto(url, timeout=90000)
-            await page.wait_for_timeout(10000)
-
-            values = await page.locator("span.stat-value--text").all_inner_texts()
-
+            
             try:
-                rank_text = await page.locator("div.grid span.truncate").first.inner_text()
-                rp_text = await page.locator("span.rank-points").first.inner_text()
-                rp_full = f"{rp_text} RP"
-            except Exception as e:
-                print("Rank fetch error:", e)
-                rank_text = "Unranked"
-                rp_full = "N/A"
+                await page.goto(url, timeout=90000, wait_until="domcontentloaded")
+                # Wait for a key element to ensure the page has loaded stats
+                await page.wait_for_selector("div.trn-defstat:has-text('Ranked')", timeout=30000)
+            except Exception:
+                # If the key element isn't found, the profile likely doesn't exist
+                await browser.close()
+                return None
+
+            stats = {}
+            
+            # --- Robustly scrape each stat ---
+            async def get_mode_stats(mode_name):
+                try:
+                    # Find the main container for the game mode (e.g., "Ranked")
+                    mode_container = page.locator(f"div.trn-defstat:has-text('{mode_name}')")
+                    
+                    # Within that container, find the specific stats by their label
+                    kd_value = await mode_container.locator("div.stat:has-text('K/D')").locator("span.stat-value").inner_text()
+                    win_value = await mode_container.locator("div.stat:has-text('Win %')").locator("span.stat-value").inner_text()
+                    
+                    return {"kd": kd_value, "win": win_value}
+                except Exception:
+                    return {"kd": "?", "win": "?"}
+
+            stats["Ranked"] = await get_mode_stats("Ranked")
+            stats["Standard"] = await get_mode_stats("Standard")
+            stats["Quick Match"] = await get_mode_stats("Quick Match")
+            
+            # --- Scrape Rank and RP ---
+            try:
+                stats["rank"] = await page.locator("div.rank-name").first.inner_text()
+                rp_text = await page.locator("div.rank-points").first.inner_text()
+                stats["rp"] = f"{rp_text}" # The site already includes "RP"
+            except Exception:
+                stats["rank"] = "Unranked"
+                stats["rp"] = "N/A"
 
             await browser.close()
-
-            return {
-                "values": values,
-                "rank": rank_text,
-                "rp": rp_full
-            }
+            return stats
 
     try:
-        result = await scrape_r6_stats(username)
-        values = result["values"]
-        rank = result["rank"]
-        rp = result["rp"]
+        data = await scrape_r6_stats(username)
 
-        def extract_mode_stats(mode):
-            if mode in values:
-                i = values.index(mode)
-                kd = values[i + 1] if i + 1 < len(values) else "?"
-                win = values[i + 2] if i + 2 < len(values) else "?"
-                return kd, win
-            return "?", "?"
-
-        ranked_kd, ranked_win = extract_mode_stats("Ranked")
-        standard_kd, standard_win = extract_mode_stats("Standard")
-        quick_kd, quick_win = extract_mode_stats("Quick Match")
+        if data is None:
+            await message.edit(content=f"❌ Could not find stats for **{username}**. Check the username and try again.")
+            return
 
         embed = discord.Embed(
             title=f"🔫 Rainbow Six Siege Stats: {username}",
-            description=f"[View Full Stats](https://r6.tracker.network/r6siege/profile/ubi/{username}/overview)",
-            color=discord.Color.blurple()
+            description=f"[View Full Profile on Tracker Network](https://r6.tracker.network/r6siege/profile/ubi/{username}/overview)",
+            color=discord.Color.blue()
         )
 
-        embed.add_field(name="🏅 Current Rank", value=f"{rank} ({rp})", inline=False)
-        embed.add_field(name="📊 Ranked", value=f"KD: {ranked_kd} | Win Rate: {ranked_win}", inline=False)
-        embed.add_field(name="🎯 Standard", value=f"KD: {standard_kd} | Win Rate: {standard_win}", inline=False)
-        embed.add_field(name="💥 Quick Match", value=f"KD: {quick_kd} | Win Rate: {quick_win}", inline=False)
+        embed.add_field(name="🏅 Current Rank", value=f"**{data['rank']}** ({data['rp']})", inline=False)
+        embed.add_field(name="📊 Ranked", value=f"K/D: **{data['Ranked']['kd']}** | Win Rate: **{data['Ranked']['win']}**", inline=False)
+        embed.add_field(name="🎯 Standard", value=f"K/D: **{data['Standard']['kd']}** | Win Rate: **{data['Standard']['win']}**", inline=False)
+        embed.add_field(name="💥 Quick Match", value=f"K/D: **{data['Quick Match']['kd']}** | Win Rate: **{data['Quick Match']['win']}**", inline=False)
+        
+        # Add a footer for a nice touch
+        embed.set_footer(text="Stats provided by Tracker Network")
 
-        await ctx.send(embed=embed)
+        await message.edit(content=None, embed=embed)
 
     except Exception as e:
-        print("R6 scrape error:", e)
-        await ctx.send("❌ Failed to fetch R6 stats. Check the username/platform or try again later.")
-
+        print(f"An error occurred in the r6 command: {e}")
+        await message.edit(content="❌ An unexpected error occurred. Please try again later.")
 #---------PHASMOPHOBIA--------#
 if os.path.exists(GHOST_JSON_PATH):
     with open(GHOST_JSON_PATH, "r") as f:
