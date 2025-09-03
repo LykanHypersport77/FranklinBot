@@ -87,7 +87,7 @@ def save_steam_links():
 async def on_ready():
     print(f"Bot connected as {bot.user}")
     if not getattr(bot, "reminders_loaded", False):
-        await bot.add_cog(Reminders(bot))
+        await bot.add_cog(reminders(bot))
         bot.reminders_loaded = True
         # register slash commands (Pycord auto-syncs in many cases; this helps ensure)
         try:
@@ -95,6 +95,11 @@ async def on_ready():
             print("Slash commands synced.")
         except Exception as e:
             print("sync_commands failed:", e)
+@bot.event
+async def on_connect():
+    if not _reminder_tick.is_running():
+        _reminder_tick.start()
+        print("[reminders] tick started on_connect()")
 
 @bot.event
 async def on_ready():
@@ -1205,7 +1210,8 @@ class ReminderView(discord.ui.View):
 class ReminderManager:
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._db = sqlite3.connect(DB_PATH)
+        # thread-safe across asyncio tasks
+        self._db = sqlite3.connect(DB_PATH, check_same_thread=False)
         self._db.execute(
             """CREATE TABLE IF NOT EXISTS reminders(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1219,10 +1225,14 @@ class ReminderManager:
         self._db.commit()
 
     def db_execute(self, sql: str, params: tuple = ()):
-        cur = self._db.cursor()
-        cur.execute(sql, params)
-        self._db.commit()
-        return cur
+        try:
+            cur = self._db.cursor()
+            cur.execute(sql, params)
+            self._db.commit()
+            return cur
+        except Exception as e:
+            print("[reminders] DB error:", e)
+            raise
 
     async def create(self, user_id: int, channel_id: int | None, guild_id: int | None, what: str, delay_seconds: int) -> int:
         due_epoch = now_epoch() + delay_seconds
