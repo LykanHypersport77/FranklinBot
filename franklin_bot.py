@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import random
 import requests
 import json
@@ -11,6 +11,8 @@ import tempfile
 from discord import SelectOption, Embed
 from io import BytesIO
 from playwright.async_api import async_playwright
+import re, sqlite3, asyncio
+from discord import Option
 
 load_dotenv()
 
@@ -32,6 +34,14 @@ LASTFM_LINK_FILE = "lastfm_links.json"
 GHOST_JSON_PATH = "phasmophobia_ghosts.json"
 
 cwd = os.getcwd()
+
+# ----- Reminders Cog -----
+DB_PATH = "reminders.db"
+
+DURATION_RE = re.compile(
+    r"^\s*(?:(?P<days>\d+)\s*d)?\s*(?:(?P<hours>\d+)\s*h)?\s*(?:(?P<minutes>\d+)\s*m)?\s*(?:(?P<seconds>\d+)\s*s)?\s*$",
+    re.IGNORECASE,
+)
 
 #----------Hypixel leveling----------#
 SKILL_XP_TABLE = [
@@ -73,6 +83,19 @@ def save_steam_links():
         json.dump(user_steam_ids, f)
 
 # -------- Bot Events --------
+@bot.event
+async def on_ready():
+    print(f"Bot connected as {bot.user}")
+    if not getattr(bot, "reminders_loaded", False):
+        await bot.add_cog(Reminders(bot))
+        bot.reminders_loaded = True
+        # register slash commands (Pycord auto-syncs in many cases; this helps ensure)
+        try:
+            await bot.sync_commands()
+            print("Slash commands synced.")
+        except Exception as e:
+            print("sync_commands failed:", e)
+
 @bot.event
 async def on_ready():
     print(f"Bot connected as {bot.user}")
@@ -1113,4 +1136,180 @@ async def earthimage(ctx, latitude: float, longitude: float):
 
     await ctx.send("Could not retrieve any imagery from NASA for the latest available dates.")
     
+
+def _parse_duration(text: str) -> int:
+    m = DURATION_RE.match(text or "")
+    if not m:
+        raise ValueError("Invalid duration. Try formats like `10m`, `2h30m`, `1d`.")
+    parts = {k: int(v) if v else 0 for k, v in m.groupdict().items()}
+    total = parts["days"]*86400 + parts["hours"]*3600 + parts["minutes"]*60 + parts["seconds"]
+    if total <= 0:
+        raise ValueError("Duration must be greater than zero.")
+    return total
+
+def _now_epoch() -> int:
+    return int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+
+class ReminderView(discord.ui.View):
+    def __init__(self, cog: "Reminders", user_id: int, what: str):
+        super().__init__(timeout=3600)  # buttons live 1h
+        self.cog = cog
+        self.user_id = user_id
+        self.what = what
+
+    async def _snooze(self, interaction: discord.Interaction, seconds: int):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Only the requester can snooze this.", ephemeral=True)
+            return
+        due_epoch = _now_epoch() + seconds
+        chan_id = interaction.channel.id if interaction.channel else None
+        guild_id = interaction.guild.id if interaction.guild else None
+        self.cog.db_execute(
+            "INSERT INTO reminders(user_id, channel_id, guild_id, what, due_at) VALUES(?,?,?,?,?)",
+            (self.user_id, chan_id, guild_id, self.what, due_epoch),
+        )
+        mins = max(1, seconds // 60)
+        await interaction.response.send_message(f"Snoozed ⏰ for {mins} min.", ephemeral=True)
+
+    @discord.ui.button(label="Snooze 5m", style=discord.ButtonStyle.secondary)
+    async def snooze_5m(self, _, interaction: discord.Interaction):
+        await self._snooze(interaction, 5 * 60)
+
+    @discord.ui.button(label="Snooze 1h", style=discord.ButtonStyle.secondary)
+    async def snooze_1h(self, _, interaction: discord.Interaction):
+        await self._snooze(interaction, 60 * 60)
+
+    @discord.ui.button(label="Done", style=discord.ButtonStyle.success)
+    async def done(self, _, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Only the requester can mark done.", ephemeral=True)
+            return
+        await interaction.response.send_message("Marked done ✅", ephemeral=True)
+        self.stop()
+        try:
+            await interaction.message.edit(view=None)
+        except Exception:
+            pass
+
+class Reminders(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        self._db = sqlite3.connect(DB_PATH)
+        self._db.execute(
+            """CREATE TABLE IF NOT EXISTS reminders(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                channel_id INTEGER,
+                guild_id INTEGER,
+                what TEXT NOT NULL,
+                due_at INTEGER NOT NULL
+            )"""
+        )
+        self._db.commit()
+        self._tick.start()
+
+    def cog_unload(self):
+        self._tick.cancel()
+        try:
+            self._db.close()
+        except Exception:
+            pass
+
+    # DB helper
+    def db_execute(self, sql: str, params: tuple = ()):
+        cur = self._db.cursor()
+        cur.execute(sql, params)
+        self._db.commit()
+        return cur
+
+    # Background checker
+    @tasks.loop(seconds=5)
+    async def _tick(self):
+        now_epoch = _now_epoch()
+        rows = self.db_execute(
+            "SELECT id, user_id, channel_id, guild_id, what, due_at FROM reminders WHERE due_at<=? ORDER BY due_at ASC",
+            (now_epoch,),
+        ).fetchall()
+        for rid, user_id, channel_id, guild_id, what, due_at in rows:
+            # delete first to avoid dupes on crashes
+            self.db_execute("DELETE FROM reminders WHERE id=?", (rid,))
+            view = ReminderView(self, user_id, what)
+            # DM preferred
+            try:
+                user = self.bot.get_user(user_id) or await self.bot.fetch_user(user_id)
+                await user.send(f"⏰ **Reminder:** {what}", view=view)
+                continue
+            except Exception:
+                pass
+            # fallback to channel
+            try:
+                if channel_id:
+                    channel = self.bot.get_channel(channel_id) or await self.bot.fetch_channel(channel_id)
+                    await channel.send(f"<@{user_id}> ⏰ **Reminder:** {what}", view=view)
+            except Exception:
+                pass
+
+    @_tick.before_loop
+    async def _before_tick(self):
+        await self.bot.wait_until_ready()
+
+    # ---- Slash commands (shows in Discord text box integration) ----
+    @discord.slash_command(name="remind", description="Set a reminder (e.g., 10m, 2h30m, 1d).")
+    async def remind(
+        self,
+        ctx: discord.ApplicationContext,
+        what: str = Option("What should I remind you about?", required=True),
+        after: str = Option("When? Examples: 10m, 2h30m, 1d", required=True),
+        dm: bool = Option("DM me when due (otherwise post in channel)", required=False, default=True),
+    ):
+        try:
+            delta = _parse_duration(after)
+        except ValueError as e:
+            await ctx.respond(f"❌ {e}", ephemeral=True)
+            return
+
+        due_epoch = _now_epoch() + delta
+        chan_id = None if dm else ctx.channel_id
+        guild_id = ctx.guild_id
+        self.db_execute(
+            "INSERT INTO reminders(user_id, channel_id, guild_id, what, due_at) VALUES(?,?,?,?,?)",
+            (ctx.user.id, chan_id, guild_id, what.strip(), due_epoch),
+        )
+        due_dt = datetime.datetime.fromtimestamp(due_epoch, tz=datetime.timezone.utc)
+        await ctx.respond(
+            f"✅ Scheduled: **{what.strip()}**\n⏰ In `{after.strip()}` (at {due_dt:%Y-%m-%d %H:%M UTC}).",
+            ephemeral=True,
+        )
+
+    @discord.slash_command(name="reminders", description="List or cancel your pending reminders.")
+    async def reminders(
+        self,
+        ctx: discord.ApplicationContext,
+        cancel: int = Option("ID of a reminder to cancel (see /reminders)", required=False),
+    ):
+        if cancel:
+            row = self.db_execute("SELECT user_id FROM reminders WHERE id=?", (cancel,)).fetchone()
+            if not row:
+                await ctx.respond("No reminder with that ID.", ephemeral=True); return
+            if row[0] != ctx.user.id:
+                await ctx.respond("You can only cancel your own reminders.", ephemeral=True); return
+            self.db_execute("DELETE FROM reminders WHERE id=?", (cancel,))
+            await ctx.respond(f"🗑️ Canceled reminder `{cancel}`.", ephemeral=True)
+            return
+
+        rows = self.db_execute(
+            "SELECT id, what, due_at, COALESCE(channel_id, 0) FROM reminders WHERE user_id=? ORDER BY due_at ASC LIMIT 25",
+            (ctx.user.id,),
+        ).fetchall()
+        if not rows:
+            await ctx.respond("You have no pending reminders.", ephemeral=True); return
+
+        lines = []
+        for rid, what, due_at, ch in rows:
+            due_dt = datetime.datetime.fromtimestamp(due_at, tz=datetime.timezone.utc)
+            where = "DM" if ch == 0 else f"channel {ch}"
+            lines.append(f"`{rid}` • {what} • {due_dt:%Y-%m-%d %H:%M UTC} • {where}")
+
+        await ctx.respond("**Your reminders:**\n" + "\n".join(lines), ephemeral=True)
+
 bot.run(DISCOD_BOT_TOKEN)
