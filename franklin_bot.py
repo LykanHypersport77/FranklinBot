@@ -195,6 +195,22 @@ async def meow(ctx):
         print("Error:", e)
         await ctx.send("⚠️ Could not send that image. It may be too large or corrupted.")
 
+@bot.command(name="alani")
+async def meow(ctx):
+    folder = os.path.join(cwd, 'pics', 'alani_pics')
+    images = [f for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
+    if not images:
+        await ctx.send("No Alani images found.")
+        return
+    image_path = os.path.join(folder, random.choice(images))
+    try:
+        print("Sending image:", image_path)
+        await ctx.send(file=discord.File(image_path))
+    except Exception as e:
+        print("❌ Failed to send:", image_path)
+        print("Error:", e)
+        await ctx.send("⚠️ Could not send that image. It may be too large or corrupted.")
+
 @bot.command(name="woof")
 async def woof(ctx):
     folder = os.path.join(cwd, 'pics', 'franklin_pics')
