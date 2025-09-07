@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands, tasks
 import random
 import requests
+from requests import Session
 import json
 import os
 from dotenv import load_dotenv
@@ -13,6 +14,7 @@ from io import BytesIO
 from playwright.async_api import async_playwright
 import re, sqlite3, asyncio
 from discord import Option
+import urllib.parse
 
 load_dotenv()
 
@@ -29,9 +31,15 @@ HYPIXEL_API_KEY = os.getenv("HYPIXEL_API_KEY")
 LASTFM_API_KEY = os.getenv("FM_API_KEY")
 NASA_API_KEY = os.getenv("NASA_API_KEY")
 NASA_APOD_URL = f"https://api.nasa.gov/planetary/apod?api_key={NASA_API_KEY}"
+COC_API_TOKEN = os.getenv("COC_API_TOKEN")
+COC_BASE = "https://api.clashofclans.com/v1"
 
 LASTFM_LINK_FILE = "lastfm_links.json"
 GHOST_JSON_PATH = "phasmophobia_ghosts.json"
+
+coc_session = Session()
+if COC_API_TOKEN:
+    coc_session.headers.update({"Authorization": f"Bearer {COC_API_TOKEN}"})
 
 cwd = os.getcwd()
 
@@ -66,6 +74,40 @@ def slayer_xp_to_level(xp: int) -> int:
         if xp < required:
             return level - 1
     return len(SLAYER_XP_TABLE) - 1
+
+#--------COC set up-------------
+
+VALID_TAG_CHARS = set("#0289PYLQGRJCUV")  # Official CoC alphabet (no letter O)
+
+def normalize_tag(tag: str) -> str:
+    """Uppercase, ensure leading '#', replace common mistake 'O'->'0', strip spaces."""
+    t = tag.strip().upper().replace("O", "0")
+    if not t.startswith("#"):
+        t = "#" + t
+    # basic sanity: keep only valid chars
+    t = "".join(ch for ch in t if ch in VALID_TAG_CHARS)
+    return t
+
+def encode_tag_for_url(tag: str) -> str:
+    """URL-encode # per API requirement."""
+    return urllib.parse.quote(tag, safe="")
+
+def coc_get(path: str, params=None):
+    if not COC_API_TOKEN:
+        raise RuntimeError("COC_API_TOKEN missing. Put it in your .env.")
+    url = f"{COC_BASE}{path}"
+    r = coc_session.get(url, params=params, timeout=12)
+    if r.status_code == 200:
+        return r.json()
+    if r.status_code == 404:
+        raise ValueError("Not found (bad player tag or hidden).")
+    if r.status_code == 403:
+        # Usually IP not allowlisted or token invalid/expired
+        raise PermissionError("403 Forbidden (check token & IP allowlist).")
+    if r.status_code == 429:
+        raise RuntimeError("Rate limited (429). Try again shortly.")
+    raise RuntimeError(f"API error {r.status_code}: {r.text[:200]}")
+
 
 # -------- Steam ID Store --------
 STEAM_LINK_FILE = "steam_links.json"
@@ -1077,6 +1119,115 @@ async def bz(ctx):
     view = BazaarView(products)
     await ctx.send(embed=embed, view=view)
 
+#------------COC-------------------#
+@bot.command(name="coc")
+async def coc_player(ctx, playertag: str):
+    """Usage: -coc #ABC123 or -coc ABC123"""
+    tag_norm = normalize_tag(playertag)
+    tag_enc = encode_tag_for_url(tag_norm)
+
+    try:
+        data = coc_get(f"/players/{tag_enc}")
+    except PermissionError as e:
+        await ctx.send("❌ CoC API 403. Make sure your **server IP is allowlisted** on developer.clashofclans.com and the token is valid.")
+        return
+    except ValueError:
+        await ctx.send(f"❌ Player not found or hidden: `{tag_norm}`")
+        return
+    except Exception as e:
+        await ctx.send(f"❌ CoC API error: {e}")
+        return
+
+    # Parse fields
+    name = data.get("name", "Unknown")
+    tag = data.get("tag", tag_norm)
+    th = data.get("townHallLevel", "?")
+    exp = data.get("expLevel", "?")
+    trophies = data.get("trophies", 0)
+    best = data.get("bestTrophies", 0)
+    war_stars = data.get("warStars", 0)
+    atk_wins = data.get("attackWins", 0)
+    def_wins = data.get("defenseWins", 0)
+
+    clan = data.get("clan") or {}
+    clan_name = clan.get("name", "—")
+    clan_tag = clan.get("tag", "—")
+    clan_badge = (clan.get("badgeUrls") or {}).get("medium")
+
+    league = data.get("league") or {}
+    league_name = league.get("name", "Unranked")
+    league_icon = (league.get("iconUrls") or {}).get("tiny")
+
+    # Top heroes (home village) by level
+    heroes = data.get("heroes", [])
+    home_heroes = [h for h in heroes if h.get("village") == "home"]
+    home_heroes.sort(key=lambda h: h.get("level", 0), reverse=True)
+    top_heroes = ", ".join(f"{h.get('name','?')} {h.get('level',0)}" for h in home_heroes[:5]) or "—"
+
+    # Build embed
+    embed = discord.Embed(
+        title=f"{name} ({tag})",
+        description=f"League: **{league_name}**",
+        color=discord.Color.brand_green()
+    )
+    embed.add_field(name="🏰 Town Hall", value=str(th), inline=True)
+    embed.add_field(name="🧪 Exp Lv", value=str(exp), inline=True)
+    embed.add_field(name="🏆 Trophies", value=f"{trophies} (best {best})", inline=True)
+
+    embed.add_field(name="⭐ War Stars", value=str(war_stars), inline=True)
+    embed.add_field(name="⚔️ Attack Wins", value=str(atk_wins), inline=True)
+    embed.add_field(name="🛡 Defense Wins", value=str(def_wins), inline=True)
+
+    embed.add_field(name="👥 Clan", value=f"{clan_name} ({clan_tag})", inline=False)
+    embed.add_field(name="🦸 Heroes", value=top_heroes, inline=False)
+
+    if league_icon:
+        embed.set_thumbnail(url=league_icon)
+    elif clan_badge:
+        embed.set_thumbnail(url=clan_badge)
+
+    # Profile link (not official API, but handy): in-game search needs tag only
+    embed.set_footer(text="Data from Clash of Clans API")
+
+    await ctx.send(embed=embed)
+
+
+@bot.command(name="cocclan")
+async def coc_clan(ctx, clantag: str):
+    tag_norm = normalize_tag(clantag)
+    tag_enc = encode_tag_for_url(tag_norm)
+    try:
+        data = coc_get(f"/clans/{tag_enc}")
+    except Exception as e:
+        await ctx.send(f"❌ {e}")
+        return
+
+    name = data.get("name","Unknown")
+    tag = data.get("tag", tag_norm)
+    desc = data.get("description","No description.")
+    members = data.get("members",0)
+    points = data.get("clanPoints",0)
+    war_league = (data.get("warLeague") or {}).get("name","—")
+    badge = (data.get("badgeUrls") or {}).get("medium")
+
+    embed = discord.Embed(
+        title=f"{name} ({tag})",
+        description=desc[:2048],
+        color=discord.Color.gold()
+    )
+    embed.add_field(name="👥 Members", value=str(members), inline=True)
+    embed.add_field(name="🏅 Points", value=str(points), inline=True)
+    embed.add_field(name="⚔️ War League", value=war_league, inline=True)
+    if badge: embed.set_thumbnail(url=badge)
+
+    # Top 5 members by trophies
+    plist = data.get("memberList", [])
+    plist.sort(key=lambda m: m.get("trophies",0), reverse=True)
+    top = "\n".join(f"{i+1}. {p.get('name','?')} — {p.get('trophies',0)}🏆"
+                    for i,p in enumerate(plist[:5])) or "—"
+    embed.add_field(name="Top Members", value=top, inline=False)
+
+    await ctx.send(embed=embed)
 
 #-------------NASA------------------#
 
