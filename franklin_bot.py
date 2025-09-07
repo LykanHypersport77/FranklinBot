@@ -31,7 +31,7 @@ HYPIXEL_API_KEY = os.getenv("HYPIXEL_API_KEY")
 LASTFM_API_KEY = os.getenv("FM_API_KEY")
 NASA_API_KEY = os.getenv("NASA_API_KEY")
 NASA_APOD_URL = f"https://api.nasa.gov/planetary/apod?api_key={NASA_API_KEY}"
-COC_API_TOKEN = os.getenv("COC_API_TOKEN")
+COC_API_TOKEN = os.getenv("COC_API_KEY")
 COC_BASE = "https://api.clashofclans.com/v1"
 
 LASTFM_LINK_FILE = "lastfm_links.json"
